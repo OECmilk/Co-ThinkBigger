@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL") // uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  name           String
+  avatar         String?   // URL or color code
+  ownedProjects  Project[] @relation("Owner")
+  memberProjects Project[] @relation("Members")
+}
+
+model Project {
+  id               String       @id @default(uuid())
+  userId           String
+  title            String       @default("New Project")
+  problemStatement String       @default("")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  
+  owner            User         @relation("Owner", fields: [userId], references: [id])
+  members          User[]       @relation("Members")
+  
+  candidates       Candidate[]
+  subProblems      SubProblem[]
+  desires          Desire[]
+  savedIdeas       SavedIdea[]
+}
+
+model Candidate {
+  id        String   @id @default(uuid())
+  projectId String
+  text      String
+  reactions String   // JSON string: Record<userId, passionLevel>
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model SubProblem {
+  id            String   @id @default(uuid())
+  projectId     String
+  title         String
+  searchQueries String?  // JSON string: [{ type, query }]
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  choices       Choice[]
+}
+
+model Choice {
+  id              String     @id @default(uuid())
+  subProblemId    String
+  text            String
+  description     String?
+  isOutsideDomain Boolean    @default(false)
+  subProblem      SubProblem @relation(fields: [subProblemId], references: [id], onDelete: Cascade)
+}
+
+model Desire {
+  id        String   @id @default(uuid())
+  projectId String
+  text      String
+  category  String   // 'self' | 'target' | 'third-party'
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model SavedIdea {
+  id          String   @id @default(uuid())
+  projectId   String
+  title       String
+  combination String   // JSON string: Record<subProblemId, choiceId>
+  ratings     String?  // JSON string: Record<desireId, rating>
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
