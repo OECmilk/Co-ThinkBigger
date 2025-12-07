@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link";
@@ -34,29 +35,37 @@ export default function Sidebar() {
   return (
     <>
       <aside className="w-20 bg-orange-300 text-white flex flex-col p-4 z-50 items-center h-screen fixed left-0 top-0">
-        <nav className="flex flex-col gap-4 items-center mt-4">
-          <Link href="/projects/default" className="hover:bg-orange-200 p-2 rounded-md" title="Home">
-            <IoHomeOutline size={28} />
-          </Link>
-          <Link href="/projects" className="hover:bg-orange-200 p-2 rounded-md" title="Projects">
-            <IoPeopleOutline size={28} />
-          </Link>
+        <nav className="flex flex-col gap-6 items-center mt-4 w-full">
+          {/* 1. Notification */}
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="hover:bg-orange-200 p-2 rounded-md relative"
+            className={`p-2 rounded-md relative transition-colors ${showNotifications ? 'bg-orange-500' : 'hover:bg-orange-200'}`}
             title="Notifications"
           >
             <IoNotificationsOutline size={28} />
-            {/* We could add a red dot here if unread, but logic requires fetching count. MVP: just icon. */}
           </button>
+
+          {/* 2. User Profile */}
+          {userName && (
+            <Link href="/profile" className="flex flex-col items-center gap-1 hover:bg-orange-200 p-2 rounded-md w-full" title="Profile">
+              <div className="w-8 h-8 rounded-full bg-white text-orange-500 flex items-center justify-center font-bold text-sm">
+                {userName[0].toUpperCase()}
+              </div>
+            </Link>
+          )}
+
+          {/* 3. Home */}
+          <Link href="/projects/default" className="hover:bg-orange-200 p-2 rounded-md" title="Home">
+            <IoHomeOutline size={28} />
+          </Link>
+
+          {/* 4. Projects */}
+          <Link href="/projects" className="hover:bg-orange-200 p-2 rounded-md" title="Projects">
+            <IoPeopleOutline size={28} />
+          </Link>
         </nav>
 
         <div className="mt-auto flex flex-col items-center gap-4 mb-4 w-full">
-          {userName && (
-            <Link href="/profile" className="text-xs font-bold text-center bg-orange-400 px-2 py-1 rounded w-full break-words hover:bg-orange-500 transition-colors shadow-sm text-white">
-              {userName}
-            </Link>
-          )}
           <button
             onClick={handleLogout}
             className="hover:bg-orange-200 p-2 rounded-md text-white"
@@ -64,9 +73,10 @@ export default function Sidebar() {
           >
             <SlLogout size={24} />
           </button>
-          <div className="text-[10px] opacity-70 mt-2">v1.0</div>
+          <div className="text-[10px] opacity-70 mt-2">v1.1</div>
         </div>
       </aside>
+
       {userId && (
         <NotificationDrawer
           isOpen={showNotifications}

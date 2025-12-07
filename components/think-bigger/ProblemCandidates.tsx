@@ -1,36 +1,19 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useProject, ProblemCandidate } from '../providers/ProjectProvider';
 import { IoChatbubbleEllipsesOutline } from "react-icons/io5";
-import ChatDrawer from '../chat/ChatDrawer';
-import { useParams } from 'next/navigation';
 
 export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
-  const { candidates, addCandidate, removeCandidate, updateReaction, setProblemStatement, members } = useProject();
+  const { candidates, addCandidate, removeCandidate, updateReaction, setProblemStatement, openChat } = useProject();
   const [inputText, setInputText] = useState('');
   const [currentUser, setCurrentUser] = useState<{ id: string, name: string }>({ id: '', name: '' });
-  const [chatCandidateId, setChatCandidateId] = useState<string | null>(null);
-  const params = useParams();
-  const projectId = params?.id as string;
 
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser');
     if (userStr) {
       setCurrentUser(JSON.parse(userStr));
-    }
-  }, []);
-
-  // Check for chat query param
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const cid = urlParams.get('chatCandidateId');
-      if (cid) {
-        setChatCandidateId(cid);
-        // clean up url
-        window.history.replaceState({}, '', window.location.pathname);
-      }
     }
   }, []);
 
@@ -111,7 +94,7 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
                   <div className="flex justify-between items-end mb-2">
                     <span className="text-xs text-gray-400 font-mono">Avg: <span className="text-orange-600 font-bold">{average}</span></span>
                     <button
-                      onClick={() => setChatCandidateId(candidate.id)}
+                      onClick={() => openChat('candidate', candidate.id)}
                       className="text-gray-400 hover:text-orange-500 transition-colors p-1"
                       title="Chat about this challenge"
                     >
@@ -159,17 +142,6 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
           )}
         </div>
       </div>
-
-      {/* Chat Drawer */}
-      <ChatDrawer
-        isOpen={!!chatCandidateId}
-        onClose={() => setChatCandidateId(null)}
-        projectId={projectId}
-        candidateId={chatCandidateId}
-        title={candidates.find(c => c.id === chatCandidateId)?.text || 'Chat'}
-        members={members}
-        currentUserId={currentUser.id}
-      />
     </div>
   );
 }

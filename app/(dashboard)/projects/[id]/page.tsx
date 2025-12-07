@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, use, useEffect } from 'react';
@@ -5,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ProjectProvider, useProject } from '@/components/providers/ProjectProvider';
 import { IoChatbubblesOutline } from "react-icons/io5";
 import ChatDrawer from '@/components/chat/ChatDrawer';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 import { ProblemCandidates } from '@/components/think-bigger/ProblemCandidates';
 import { DeconstructionBoard } from '@/components/think-bigger/DeconstructionBoard';
@@ -13,9 +15,8 @@ import { ChoiceMap } from '@/components/think-bigger/ChoiceMap';
 import { CombinationTable } from '@/components/think-bigger/CombinationTable';
 
 function ProjectWorkspace() {
-  const { title, projectId, members } = useProject();
+  const { title, projectId, members, activeChat, openChat, closeChat } = useProject();
   const [currentStep, setCurrentStep] = useState(1);
-  const [showChat, setShowChat] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ id: string, name: string } | null>(null);
   const searchParams = useSearchParams();
 
@@ -25,16 +26,16 @@ function ProjectWorkspace() {
   }, []);
 
   useEffect(() => {
-    const openChat = searchParams.get('openChat');
-    if (openChat === 'true') {
-      setShowChat(true);
+    const openChatParam = searchParams.get('openChat');
+    if (openChatParam === 'true') {
+      openChat('project');
       window.history.replaceState({}, '', window.location.pathname);
     }
     const cid = searchParams.get('chatCandidateId');
     if (cid) {
       setCurrentStep(1);
     }
-  }, [searchParams]);
+  }, [searchParams, openChat]);
 
   const steps = [
     { id: 1, name: '課題選定 (Step 1)', component: ProblemCandidates },
@@ -59,12 +60,13 @@ function ProjectWorkspace() {
         <h1 className="text-xl font-bold text-gray-800">{title || 'Loading...'}</h1>
         <div className="flex gap-2 items-center">
           <button
-            onClick={() => setShowChat(true)}
-            className="p-2 text-gray-500 hover:bg-orange-100 hover:text-orange-600 rounded-full transition-colors mr-2"
+            onClick={() => activeChat?.type === 'project' ? closeChat() : openChat('project')}
+            className={`p-2 rounded-full transition-colors mr-2 ${activeChat?.type === 'project' ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-orange-100 hover:text-orange-600'}`}
             title="Project Chat"
           >
             <IoChatbubblesOutline size={24} />
           </button>
+
           {steps.map(step => (
             <button
               key={step.id}
@@ -91,12 +93,15 @@ function ProjectWorkspace() {
         </div>
       </main>
 
-      {projectId && currentUser && (
+      {projectId && currentUser && activeChat && (
         <ChatDrawer
-          isOpen={showChat}
-          onClose={() => setShowChat(false)}
+          isOpen={true} // Controlled by activeChat existence
+          onClose={closeChat}
           projectId={projectId}
-          title={title + " - Chat"}
+          candidateId={activeChat.type === 'candidate' ? activeChat.id : undefined}
+          title={activeChat.type === 'candidate'
+            ? 'Chat - Candidate' // Ideally fetch candidate text, but simplified for now
+            : title + " - Chat"}
           members={members}
           currentUserId={currentUser.id}
         />
@@ -148,7 +153,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }, [id, router]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-500">Loading Project...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-500">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (

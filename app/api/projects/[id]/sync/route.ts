@@ -61,17 +61,39 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       });
 
       // 2. Candidates
-      // Delete existing and re-create.
-      await tx.candidate.deleteMany({ where: { projectId } });
+      // Smart Sync to preserve Messages (cannot just deleteMany due to Cascade)
+      const existingCandidates = await tx.candidate.findMany({ where: { projectId }, select: { id: true } });
+      const existingIds = new Set(existingCandidates.map((c: any) => c.id));
+      const newIds = new Set(body.candidates?.map((c: any) => c.id) || []);
+
+      // Delete removed candidates
+      const toDelete = [...existingIds].filter(id => !newIds.has(id));
+      if (toDelete.length > 0) {
+        await tx.candidate.deleteMany({ where: { id: { in: toDelete } } });
+      }
+
+      // Upsert (Update or Create)
       if (body.candidates && body.candidates.length > 0) {
-        await tx.candidate.createMany({
-          data: body.candidates.map((c: any) => ({
-            id: c.id, // Preserve ID
-            projectId,
-            text: c.text,
-            reactions: JSON.stringify(c.reactions || {})
-          }))
-        });
+        for (const c of body.candidates) {
+          if (existingIds.has(c.id)) {
+            await tx.candidate.update({
+              where: { id: c.id },
+              data: {
+                text: c.text,
+                reactions: JSON.stringify(c.reactions || {})
+              }
+            });
+          } else {
+            await tx.candidate.create({
+              data: {
+                id: c.id,
+                projectId,
+                text: c.text,
+                reactions: JSON.stringify(c.reactions || {})
+              }
+            });
+          }
+        }
       }
 
       // 3. Desires

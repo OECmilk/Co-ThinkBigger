@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -32,6 +33,9 @@ export interface ProjectState {
 
   // Members for Chat
   members: { id: string; name: string; avatar: string | null }[];
+
+  // Chat State
+  activeChat: { type: 'project' | 'candidate'; id?: string } | null;
 }
 
 export type DesireCategory = 'self' | 'target' | 'third-party';
@@ -81,6 +85,10 @@ interface ProjectContextType extends ProjectState {
   addSearchQuery: (subProblemId: string, type: 'general' | 'partial' | 'parallel', query: string) => void;
   loadProject: (id: string) => Promise<void>;
   saveProject: () => Promise<void>;
+
+  // Chat Control
+  openChat: (type: 'project' | 'candidate', id?: string) => void;
+  closeChat: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -103,6 +111,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
   const [desires, setDesires] = useState<Desire[]>([]);
   const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>([]);
   const [members, setMembers] = useState<{ id: string; name: string; avatar: string | null }[]>([]);
+  const [activeChat, setActiveChat] = useState<{ type: 'project' | 'candidate'; id?: string } | null>(null);
 
   // Initial Load from DB (Simulated for default project for now if no ID)
   // In real app, we get ID from URL or list
@@ -311,6 +320,14 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
     }));
   };
 
+  const openChat = (type: 'project' | 'candidate', id?: string) => {
+    setActiveChat({ type, id });
+  };
+
+  const closeChat = () => {
+    setActiveChat(null);
+  };
+
   const value = {
     projectId,
     title,
@@ -321,6 +338,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
     desires,
     savedIdeas,
     members,
+    activeChat,
     setProblemStatement,
     addSubProblem,
     updateSubProblem,
@@ -338,9 +356,11 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
     addSearchQuery,
     saveIdea,
     rateIdea,
-    // Expose load/save if needed
+
     loadProject,
-    saveProject
+    saveProject,
+    openChat,
+    closeChat
   };
 
   return (
