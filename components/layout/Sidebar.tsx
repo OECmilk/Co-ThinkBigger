@@ -51,6 +51,7 @@ export default function Sidebar() {
         >
           <SlLogout size={24} />
         </button>
+        <div className="text-[10px] opacity-70 mt-2">v1.0</div>
       </div>
     </aside>
   );
