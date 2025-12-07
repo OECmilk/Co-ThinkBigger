@@ -1,16 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProject, ProblemCandidate } from '../providers/ProjectProvider';
-
-// Debug tools removed.
-// In real app, we get current user from context.
-const CURRENT_USER_ID = 'current-user';
+import { IoChatbubbleEllipsesOutline } from "react-icons/io5";
+import ChatDrawer from '../chat/ChatDrawer';
+import { useParams } from 'next/navigation';
 
 export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
-  const { candidates, addCandidate, removeCandidate, updateReaction, setProblemStatement } = useProject();
+  const { candidates, addCandidate, removeCandidate, updateReaction, setProblemStatement, members } = useProject();
   const [inputText, setInputText] = useState('');
-  const [perspectiveUser, setPerspectiveUser] = useState(CURRENT_USER_ID);
+  const [currentUser, setCurrentUser] = useState<{ id: string, name: string }>({ id: '', name: '' });
+  const [chatCandidateId, setChatCandidateId] = useState<string | null>(null);
+  const params = useParams();
+  const projectId = params?.id as string;
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
+  }, []);
+
+  // Check for chat query param
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const cid = urlParams.get('chatCandidateId');
+      if (cid) {
+        setChatCandidateId(cid);
+        // clean up url
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, []);
 
   const handleAdd = () => {
     if (!inputText.trim()) return;
@@ -71,7 +93,7 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
         {/* Compact Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {sortedCandidates.map(candidate => {
-            const myPassion = candidate.reactions[perspectiveUser] || 0;
+            const myPassion = candidate.reactions[currentUser.id] || 0;
             const scores = Object.values(candidate.reactions);
             const average = scores.length
               ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
@@ -89,6 +111,13 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
                   <div className="flex justify-between items-end mb-2">
                     <span className="text-xs text-gray-400 font-mono">Avg: <span className="text-orange-600 font-bold">{average}</span></span>
                     <button
+                      onClick={() => setChatCandidateId(candidate.id)}
+                      className="text-gray-400 hover:text-orange-500 transition-colors p-1"
+                      title="Chat about this challenge"
+                    >
+                      <IoChatbubbleEllipsesOutline size={18} />
+                    </button>
+                    <button
                       onClick={() => handlePromote(candidate)}
                       className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded hover:bg-blue-100 font-medium"
                     >
@@ -101,7 +130,7 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
                     {[1, 2, 3, 4, 5].map(level => (
                       <button
                         key={level}
-                        onClick={() => updateReaction(candidate.id, perspectiveUser, level)}
+                        onClick={() => updateReaction(candidate.id, currentUser.id, level)}
                         className={`flex-1 h-6 text-[10px] rounded flex items-center justify-center transition-colors ${myPassion === level
                           ? 'bg-orange-500 text-white font-bold'
                           : 'bg-gray-50 text-gray-300 hover:bg-orange-100'
@@ -130,6 +159,17 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Chat Drawer */}
+      <ChatDrawer
+        isOpen={!!chatCandidateId}
+        onClose={() => setChatCandidateId(null)}
+        projectId={projectId}
+        candidateId={chatCandidateId}
+        title={candidates.find(c => c.id === chatCandidateId)?.text || 'Chat'}
+        members={members}
+        currentUserId={currentUser.id}
+      />
     </div>
   );
 }

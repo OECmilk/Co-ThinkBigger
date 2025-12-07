@@ -13,7 +13,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         candidates: true,
         subProblems: { include: { choices: true } },
         desires: true,
-        savedIdeas: true
+        savedIdeas: true,
+        members: { select: { id: true, name: true, avatar: true } },
+        owner: { select: { id: true, name: true, avatar: true } }
       }
     });
 

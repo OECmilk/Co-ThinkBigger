@@ -19,6 +19,7 @@ export interface SubProblem {
 }
 
 export interface ProjectState {
+  projectId: string | null;
   title: string;
   problemStatement: string;
   subProblems: SubProblem[];
@@ -28,6 +29,9 @@ export interface ProjectState {
   candidates: ProblemCandidate[];
   desires: Desire[];
   savedIdeas: SavedIdea[];
+
+  // Members for Chat
+  members: { id: string; name: string; avatar: string | null }[];
 }
 
 export type DesireCategory = 'self' | 'target' | 'third-party';
@@ -98,6 +102,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
   const [candidates, setCandidates] = useState<ProblemCandidate[]>([]);
   const [desires, setDesires] = useState<Desire[]>([]);
   const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>([]);
+  const [members, setMembers] = useState<{ id: string; name: string; avatar: string | null }[]>([]);
 
   // Initial Load from DB (Simulated for default project for now if no ID)
   // In real app, we get ID from URL or list
@@ -116,6 +121,15 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
       setCandidates(p.candidates || []);
       setDesires(p.desires || []);
       setSavedIdeas(p.savedIdeas || []);
+
+      // Combine owner and members
+      const allMembers = [];
+      if (p.owner) allMembers.push(p.owner);
+      if (p.members) allMembers.push(...p.members);
+      // Remove duplicates just in case
+      const uniqueMembers = Array.from(new Map(allMembers.map(m => [m.id, m])).values());
+      setMembers(uniqueMembers);
+
     } catch (e) {
       console.error("Load error", e);
     }
@@ -298,6 +312,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
   };
 
   const value = {
+    projectId,
     title,
     problemStatement,
     subProblems,
@@ -305,6 +320,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
     candidates,
     desires,
     savedIdeas,
+    members,
     setProblemStatement,
     addSubProblem,
     updateSubProblem,

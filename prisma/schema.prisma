@@ -14,8 +14,10 @@ model User {
   password       String
   name           String
   avatar         String?   // URL or color code
-  ownedProjects  Project[] @relation("Owner")
-  memberProjects Project[] @relation("Members")
+  ownedProjects  Project[]      @relation("Owner")
+  memberProjects Project[]      @relation("Members")
+  messages       Message[]
+  notifications  Notification[]
 }
 
 model Project {
@@ -33,6 +35,7 @@ model Project {
   subProblems      SubProblem[]
   desires          Desire[]
   savedIdeas       SavedIdea[]
+  messages         Message[]
 }
 
 model Candidate {
@@ -41,6 +44,7 @@ model Candidate {
   text      String
   reactions String   // JSON string: Record<userId, passionLevel>
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages  Message[]
 }
 
 model SubProblem {
@@ -76,4 +80,33 @@ model SavedIdea {
   combination String   // JSON string: Record<subProblemId, choiceId>
   ratings     String?  // JSON string: Record<desireId, rating>
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id          String     @id @default(uuid())
+  content     String
+  createdAt   DateTime   @default(now())
+  
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  notifications Notification[]
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   // Recipient
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
