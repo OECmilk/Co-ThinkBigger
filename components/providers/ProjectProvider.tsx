@@ -112,6 +112,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
   const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>([]);
   const [members, setMembers] = useState<{ id: string; name: string; avatar: string | null }[]>([]);
   const [activeChat, setActiveChat] = useState<{ type: 'project' | 'candidate'; id?: string } | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Initial Load from DB (Simulated for default project for now if no ID)
   // In real app, we get ID from URL or list
@@ -141,6 +142,8 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
 
     } catch (e) {
       console.error("Load error", e);
+    } finally {
+      setIsLoaded(true);
     }
   };
 
@@ -172,7 +175,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
 
   // Auto-save effect
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !isLoaded) return;
 
     const saveData = async () => {
       console.log('Auto-saving...');
@@ -197,7 +200,7 @@ export function ProjectProvider({ children, initialProjectId }: { children: Reac
     const timer = setTimeout(saveData, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [projectId, problemStatement, subProblems, candidates, desires, savedIdeas]);
+  }, [projectId, isLoaded, problemStatement, subProblems, candidates, desires, savedIdeas]);
 
 
   const addSubProblem = (title: string) => {
