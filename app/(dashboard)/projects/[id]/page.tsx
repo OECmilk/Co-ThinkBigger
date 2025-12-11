@@ -56,12 +56,23 @@ function ProjectWorkspace() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header / Stepper */}
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">{title || 'Loading...'}</h1>
-        <div className="flex gap-2 items-center">
+      {/* Header / Stepper */}
+      <header className="bg-white border-b px-4 py-3 md:px-6 md:py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex justify-between items-center w-full md:w-auto">
+          <h1 className="text-lg md:text-xl font-bold text-gray-800 truncate max-w-[200px] md:max-w-none">{title || 'Loading...'}</h1>
           <button
             onClick={() => activeChat?.type === 'project' ? closeChat() : openChat('project')}
-            className={`p-2 rounded-full transition-colors mr-2 ${activeChat?.type === 'project' ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-orange-100 hover:text-orange-600'}`}
+            className={`md:hidden p-2 rounded-full transition-colors ${activeChat?.type === 'project' ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-orange-100 hover:text-orange-600'}`}
+            title="Project Chat"
+          >
+            <IoChatbubblesOutline size={20} />
+          </button>
+        </div>
+
+        <div className="flex gap-2 items-center flex-wrap justify-center md:justify-end w-full md:w-auto">
+          <button
+            onClick={() => activeChat?.type === 'project' ? closeChat() : openChat('project')}
+            className={`hidden md:block p-2 rounded-full transition-colors mr-2 ${activeChat?.type === 'project' ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-orange-100 hover:text-orange-600'}`}
             title="Project Chat"
           >
             <IoChatbubblesOutline size={24} />
@@ -71,12 +82,14 @@ function ProjectWorkspace() {
             <button
               key={step.id}
               onClick={() => setCurrentStep(step.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${currentStep === step.id
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-colors ${currentStep === step.id
                 ? 'bg-orange-500 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
+              title={step.name}
             >
-              {step.name}
+              <span className="md:hidden">{step.id}</span>
+              <span className="hidden md:inline">{step.name}</span>
             </button>
           ))}
         </div>

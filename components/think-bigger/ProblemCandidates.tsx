@@ -74,7 +74,7 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
         </div>
 
         {/* Compact Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {sortedCandidates.map(candidate => {
             const myPassion = candidate.reactions[currentUser.id] || 0;
             const scores = Object.values(candidate.reactions);
