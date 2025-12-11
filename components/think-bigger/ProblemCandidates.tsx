@@ -44,7 +44,7 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white p-3 md:p-6 rounded-xl shadow-sm border border-gray-100">
         <div className="flex justify-between items-start mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Step 1: 課題の定義と選定</h2>
@@ -67,9 +67,10 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
           <button
             onClick={handleAdd}
             disabled={!inputText.trim()}
-            className="px-4 py-2 bg-gray-800 text-white font-bold rounded text-sm hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 bg-gray-800 text-white font-bold rounded text-sm hover:bg-gray-700 disabled:opacity-50 transition-colors flex items-center justify-center min-w-[40px]"
           >
-            Add
+            <span className="md:hidden text-lg">+</span>
+            <span className="hidden md:inline">Add</span>
           </button>
         </div>
 

@@ -33,9 +33,10 @@ export default function DashboardLayout({
 			)}
 
 			{/* Main Content */}
-			{/* ml-0 on mobile (because sidebar is hidden/absolute), ml-20 on desktop (fixed sidebar width) */}
-			<main className="flex-1 ml-0 md:ml-20 p-6 bg-gray-100 overflow-y-auto w-full">
-				<div className="mt-12 md:mt-0">
+			{/* ml-0 on mobile, ml-20 on desktop */}
+			{/* p-0 on mobile (edge-to-edge), p-6 on desktop */}
+			<main className="flex-1 ml-0 md:ml-20 p-0 md:p-6 bg-gray-100 overflow-y-auto w-full">
+				<div className="pt-14 md:pt-0 h-full">
 					{children}
 				</div>
 			</main>

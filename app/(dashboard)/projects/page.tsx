@@ -129,14 +129,15 @@ export default function ProjectsListPage() {
   if (loading) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto p-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 md:gap-0">
-        <h1 className="text-2xl font-bold text-gray-800">プロジェクト一覧</h1>
+    <div className="max-w-6xl mx-auto p-4 md:p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-lg md:text-2xl font-bold text-gray-800">プロジェクト一覧</h1>
         <button
           onClick={createProject}
-          className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600 transition-colors font-bold w-full md:w-auto"
+          className="bg-orange-500 text-white p-2 md:px-4 md:py-2 rounded shadow hover:bg-orange-600 transition-colors font-bold flex items-center justify-center"
         >
-          + 新規プロジェクト
+          <span className="md:hidden text-xl font-bold px-2">+</span>
+          <span className="hidden md:inline">+ 新規プロジェクト</span>
         </button>
       </div>
 
