@@ -2,13 +2,18 @@
 'use client';
 
 import Link from "next/link";
-import { IoHomeOutline, IoPeopleOutline, IoNotificationsOutline } from "react-icons/io5";
+import { IoHomeOutline, IoPeopleOutline, IoNotificationsOutline, IoClose } from "react-icons/io5";
 import { SlLogout } from "react-icons/sl";
 import { useEffect, useState } from "react";
 import NotificationDrawer from "../chat/NotificationDrawer";
 import { useRouter } from "next/navigation";
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [userName, setUserName] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -34,7 +39,20 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="w-20 bg-orange-300 text-white flex flex-col p-4 z-50 items-center h-screen fixed left-0 top-0">
+      <aside
+        className={`
+          w-20 bg-orange-300 text-white flex flex-col p-4 z-50 items-center h-screen fixed left-0 top-0
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0
+        `}
+      >
+        <div className="md:hidden w-full flex justify-center mb-4">
+           <button onClick={onClose} className="p-2 hover:bg-orange-400 rounded-full">
+             <IoClose size={24} />
+           </button>
+        </div>
+
         <nav className="flex flex-col gap-6 items-center mt-4 w-full">
           {/* 1. Notification */}
           <button

@@ -130,11 +130,11 @@ export default function ProjectsListPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 md:gap-0">
         <h1 className="text-2xl font-bold text-gray-800">プロジェクト一覧</h1>
         <button
           onClick={createProject}
-          className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600 transition-colors font-bold"
+          className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600 transition-colors font-bold w-full md:w-auto"
         >
           + 新規プロジェクト
         </button>
