@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useProject, ProblemCandidate } from '../providers/ProjectProvider';
-import { IoChatbubbleEllipsesOutline } from "react-icons/io5";
+import { IoChatbubbleEllipsesOutline, IoFlame } from "react-icons/io5";
 
 export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
   const { candidates, addCandidate, removeCandidate, updateReaction, setProblemStatement, openChat } = useProject();
@@ -41,6 +41,16 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
     };
     return getScore(b) - getScore(a);
   });
+
+  // Helper for member colors
+  const getMemberColor = (id: string) => {
+    const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500'];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const { members } = useProject(); // We need members list to map IDs to Names
 
   return (
     <div className="space-y-4">
@@ -84,15 +94,15 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
               : "0.0";
 
             return (
-              <div key={candidate.id} className="group relative bg-white p-3 rounded border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all flex flex-col justify-between h-40">
+              <div key={candidate.id} className="group relative bg-white p-3 rounded border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all flex flex-col justify-between min-h-[180px]">
                 {/* Text */}
-                <div className="overflow-y-auto mb-2 scrollbar-thin scrollbar-thumb-gray-200">
+                <div className="overflow-y-auto mb-2 scrollbar-thin scrollbar-thumb-gray-200 flex-grow max-h-24">
                   <h3 className="text-sm font-semibold text-gray-800 leading-tight">{candidate.text}</h3>
                 </div>
 
                 {/* Footer area */}
-                <div className="mt-auto pt-2 border-t border-gray-50">
-                  <div className="flex justify-between items-end mb-2">
+                <div className="mt-auto pt-2 border-t border-gray-50 flex-shrink-0">
+                  <div className="flex justify-between items-end mb-3">
                     <span className="text-xs text-gray-400 font-mono">Avg: <span className="text-orange-600 font-bold">{average}</span></span>
                     <button
                       onClick={() => openChat('candidate', candidate.id)}
@@ -109,20 +119,57 @@ export function ProblemCandidates({ onNext }: { onNext?: () => void }) {
                     </button>
                   </div>
 
-                  {/* Tiny Gauge */}
-                  <div className="flex justify-between items-center gap-1">
-                    {[1, 2, 3, 4, 5].map(level => (
-                      <button
-                        key={level}
-                        onClick={() => updateReaction(candidate.id, currentUser.id, level)}
-                        className={`flex-1 h-6 text-[10px] rounded flex items-center justify-center transition-colors ${myPassion === level
-                          ? 'bg-orange-500 text-white font-bold'
-                          : 'bg-gray-50 text-gray-300 hover:bg-orange-100'
-                          }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
+                  {/* Voting Area */}
+                  <div className="relative">
+                    {/* Scale Title/Guide for first item maybe? Or just global legend... let's separate guides locally for now as requested */}
+
+                    <div className="flex justify-between items-center gap-1 mb-1">
+                      {[1, 2, 3, 4, 5].map(level => {
+                        // Who voted this level?
+                        const voters = Object.entries(candidate.reactions)
+                          .filter(([uid, val]) => val === level)
+                          .map(([uid]) => members.find(m => m.id === uid))
+                          .filter(Boolean);
+
+                        return (
+                          <div key={level} className="flex-1 flex flex-col items-center gap-0.5">
+                            {/* Member Dots */}
+                            <div className="h-2 flex -space-x-1 justify-center mb-0.5 w-full">
+                              {voters.map((m, idx) => (
+                                <div
+                                  key={m?.id || idx}
+                                  className={`w-2 h-2 rounded-full border border-white ${getMemberColor(m?.id || "")}`}
+                                  title={m?.name}
+                                />
+                              ))}
+                            </div>
+
+                            <button
+                              onClick={() => updateReaction(candidate.id, currentUser.id, level)}
+                              className={`w-full h-8 text-[10px] rounded flex items-center justify-center transition-colors ${myPassion === level
+                                ? 'bg-orange-500 text-white font-bold shadow-sm'
+                                : 'bg-gray-50 text-gray-300 hover:bg-orange-100'
+                                }`}
+                            >
+                              {level}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Visual Guide <--> */}
+                    <div className="flex justify-between items-center px-1 opacity-50 text-[10px] text-gray-400">
+                      <div className="flex items-center gap-0.5" title="無関心">
+                        <span className="text-gray-400"><IoFlame size={10} /></span>
+                        <span className="scale-75 origin-left">無</span>
+                      </div>
+                      <div className="h-[1px] bg-gray-200 flex-1 mx-2"></div>
+                      <div className="flex items-center gap-0.5 text-orange-500" title="情熱">
+                        <span className="scale-75 origin-right font-bold">情熱</span>
+                        <span><IoFlame size={14} /></span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
