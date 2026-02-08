@@ -1,3 +1,79 @@
 @import "tailwindcss";
 
+:root {
+  --background: #f5f5f4;
+  /* stone-100 */
+  --foreground: #292524;
+  /* stone-800 */
+  --primary: #f97316;
+  /* orange-500 */
+  --pixel-border: 4px;
+}
 
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Custom Scrollbar for Pixel Feel */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e7e5e4;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a8a29e;
+  border: 2px solid #e7e5e4;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}
+
+/* Pixel Art Utilities */
+.pixel-border {
+  box-shadow:
+    -4px 0 0 0 #292524,
+    4px 0 0 0 #292524,
+    0 -4px 0 0 #292524,
+    0 4px 0 0 #292524;
+  margin: 4px;
+}
+
+.pixel-border-sm {
+  box-shadow:
+    -2px 0 0 0 #292524,
+    2px 0 0 0 #292524,
+    0 -2px 0 0 #292524,
+    0 2px 0 0 #292524;
+  margin: 2px;
+}
+
+.pixel-shadow {
+  box-shadow: 4px 4px 0 0 #292524;
+}
+
+.pixel-shadow-active:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 0 #292524;
+}
+
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, #e7e5e4 1px, transparent 1px),
+    linear-gradient(to bottom, #e7e5e4 1px, transparent 1px);
+}
+
+/* Typography Enhancements */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: 0.05em;
+}

@@ -4,109 +4,192 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL") // uses connection pooling
-  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  password       String
-  name           String
-  avatar         String?   // URL or color code
-  ownedProjects  Project[]      @relation("Owner")
-  memberProjects Project[]      @relation("Members")
-  messages       Message[]
-  notifications  Notification[]
+// Public Profiles (linked to auth.users via triggers normally, but we manage manually for now)
+model Profile {
+  id        String   @id @default(uuid())
+  userId    String   @unique // Links to Supabase Auth User ID
+  username  String   @unique
+  avatarUrl String?
+  jobTitle  String?
+  bio       String?
+  
+  projects      ProjectMember[]
+  messages      Message[]
+  notifications Notification[]
+  reactions     Reaction[]
+  achievements  Achievement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Project {
-  id               String       @id @default(uuid())
-  userId           String
-  title            String       @default("New Project")
-  problemStatement String       @default("")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  inviteCode  String?  @unique
   
-  owner            User         @relation("Owner", fields: [userId], references: [id])
-  members          User[]       @relation("Members")
+  members     ProjectMember[]
+  candidates  Candidate[]
+  subProblems SubProblem[]
+  desires     Desire[]
+  solutions   Solution[]
+  messages    Message[]
   
-  candidates       Candidate[]
-  subProblems      SubProblem[]
-  desires          Desire[]
-  savedIdeas       SavedIdea[]
-  messages         Message[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  profileId String
+  role      String   @default("member") // owner, member
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, profileId])
+}
+
+// Step 3: Candidate Challenges
 model Candidate {
-  id        String   @id @default(uuid())
-  projectId String
-  text      String
-  reactions String   // JSON string: Record<userId, passionLevel>
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  messages  Message[]
-}
-
-model SubProblem {
-  id            String   @id @default(uuid())
-  projectId     String
-  title         String
-  searchQueries String?  // JSON string: [{ type, query }]
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  choices       Choice[]
-}
-
-model Choice {
-  id              String     @id @default(uuid())
-  subProblemId    String
-  text            String
-  description     String?
-  isOutsideDomain Boolean    @default(false)
-  subProblem      SubProblem @relation(fields: [subProblemId], references: [id], onDelete: Cascade)
-}
-
-model Desire {
-  id        String   @id @default(uuid())
-  projectId String
-  text      String
-  category  String   // 'self' | 'target' | 'third-party'
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-}
-
-model SavedIdea {
   id          String   @id @default(uuid())
   projectId   String
   title       String
-  combination String   // JSON string: Record<subProblemId, choiceId>
-  ratings     String?  // JSON string: Record<desireId, rating>
+  description String?
+  authorId    String
+
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  reactions   Reaction[]
+  messages    Message[]
+
+  createdAt   DateTime @default(now())
 }
 
+model Reaction {
+  id          String   @id @default(uuid())
+  candidateId String
+  profileId   String
+  score       Int      @default(1)
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  profile     Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, profileId])
+}
+
+// Step 4: Decomposition
+model SubProblem {
+  id        String   @id @default(uuid())
+  projectId String
+  title     String
+  order     Int      @default(0)
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  choices   Choice[]
+
+  authorId  String? // Make optional for migration compatibility, though ideally required
+  isShared  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+// Step 6: Choice Map
+model Choice {
+  id              String   @id @default(uuid())
+  subProblemId    String
+  title           String   // The solution example
+  description     String?
+  sourceURL       String?
+  isOutsideDomain Boolean  @default(false)
+
+  subProblem      SubProblem @relation(fields: [subProblemId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+}
+
+// Step 5: Stakeholder Desires (Triangle)
+model Desire {
+  id           String   @id @default(uuid())
+  projectId    String
+  type         String   // self, target, third-party
+  content      String
+  
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evaluations  Evaluation[]
+
+  createdAt    DateTime @default(now())
+}
+
+// Step 7: Solutions (Combinations)
+model Solution {
+  id           String   @id @default(uuid())
+  projectId    String
+  name         String?
+  description  String?
+  components   Json     // Record<subProblemId, choiceId>
+  authorId     String?  // Profile ID of the creator
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evaluations  Evaluation[]
+
+  createdAt    DateTime @default(now())
+}
+
+// Step 8: Radar Chart Evaluations
+model Evaluation {
+  id         String   @id @default(uuid())
+  solutionId String
+  desireId   String
+  score      Int      // 0-10 or similar
+
+  solution   Solution @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  desire     Desire   @relation(fields: [desireId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionId, desireId])
+}
+
+// Chat System
 model Message {
-  id          String     @id @default(uuid())
+  id          String   @id @default(uuid())
   content     String
-  createdAt   DateTime   @default(now())
   
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
-  
-  projectId   String
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  candidateId String?
+  projectId   String?  // Step 4 chat
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  candidateId String?  // Step 3 chat
   candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   
-  notifications Notification[]
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
 }
 
 model Notification {
   id        String   @id @default(uuid())
-  userId    String   // Recipient
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  messageId String
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  
+  profileId String
+  title     String
+  content   String
   read      Boolean  @default(false)
+  type      String   // email, in-app
+  
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  profileId   String
+  badgeType   String
+  unlockedAt  DateTime @default(now())
+
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }

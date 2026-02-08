@@ -1,12 +1,15 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { DotGothic16 } from 'next/font/google';
 
-const inter = Inter({ subsets: ['latin'] });
+const dotGothic = DotGothic16({
+  weight: '400',
+  subsets: ['latin'],
+});
 
 export const metadata: Metadata = {
   title: 'Co-Think Bigger',
-  description: 'Collaborative Idea Generation Tool',
+  description: 'シーナアイエンガーの名著「THINK BIGGER」を完遂するためのWEBアプリ',
 };
 
 export default function RootLayout({
@@ -15,8 +18,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="ja">
+      <body className={`${dotGothic.className} bg-stone-100 text-stone-800 antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,200 +1,348 @@
+"use client";
 
-'use client';
+import { useEffect, useState, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { PixelButton } from "@/components/ui/PixelButton";
+import { PixelInput } from "@/components/ui/PixelInput";
+import { FaTimes, FaPaperPlane, FaQuoteLeft, FaTrash } from "react-icons/fa";
+import { cn } from "@/lib/utils";
 
-import { useState, useEffect, useRef } from 'react';
-import { IoClose, IoSend } from 'react-icons/io5';
-
-interface Message {
+type Message = {
   id: string;
   content: string;
   createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    avatar: string | null;
+  mindMapNodeId?: string | null;
+  profile: {
+    username: string;
+    avatarUrl: string | null;
   };
-}
+  profileId: string;
+};
 
-interface ChatDrawerProps {
+type ChatDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
-  candidateId?: string | null;
+  candidateId?: string | null; // If null, project chat
   title: string;
-  members: { id: string; name: string; avatar: string | null }[];
-  currentUserId: string;
-}
+  variant?: 'drawer' | 'inline';
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  replyToNode?: { id: string; label: string } | null;
+  onClearReply?: () => void;
+  onMessageHover?: (nodeId: string | null) => void;
+};
 
-export default function ChatDrawer({ isOpen, onClose, projectId, candidateId, title, members, currentUserId }: ChatDrawerProps) {
+export function ChatDrawer({
+  isOpen,
+  onClose,
+  projectId,
+  candidateId,
+  title,
+  variant = 'drawer',
+  inputRef,
+  replyToNode,
+  onClearReply,
+  onMessageHover
+}: ChatDrawerProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [showMentions, setShowMentions] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<{ username: string, avatarUrl: string | null } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, messageId: string } | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    // Fetch current user profile
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('Profile').select('id, username, avatarUrl').eq('userId', user.id).single();
+        if (profile) {
+          setCurrentProfileId(profile.id);
+          setCurrentProfile({ username: profile.username, avatarUrl: profile.avatarUrl });
+        }
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  useEffect(() => {
+    // Only fetch if open or inline
+    if ((isOpen || variant === 'inline') && (projectId || candidateId)) {
       fetchMessages();
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen, projectId, candidateId]);
 
+      const channel = supabase
+        .channel('realtime-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'Message',
+            filter: candidateId
+              ? `candidateId=eq.${candidateId}`
+              : `projectId=eq.${projectId} AND candidateId=is.null`,
+          },
+          (payload) => {
+            // We can optimistically handle but fetching is safer for duplicates if we already did optimistic
+            // Let's just fetch for now, but ensure we do optimistic insert in handleSend
+            fetchMessages();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'Message',
+          },
+          () => { fetchMessages(); }
+        )
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [isOpen, projectId, candidateId, variant]);
+
+  // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isOpen]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const isDrawer = variant === 'drawer';
 
-  const fetchMessages = async () => {
-    const url = new URL(`/api/projects/${projectId}/chat`, window.location.origin);
-    if (candidateId) url.searchParams.set('candidateId', candidateId);
+  // Return logic
+  if (!isOpen && isDrawer) return null;
 
-    try {
-      const res = await fetch(url.toString());
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data.messages);
-      }
-    } catch (e) {
-      console.error(e);
+  const containerClasses = isDrawer
+    ? cn(
+      "fixed top-0 right-0 h-full w-full md:w-[400px] bg-white z-50 shadow-2xl transition-transform duration-300 ease-in-out border-l-4 border-stone-800 flex flex-col",
+      isOpen ? "translate-x-0" : "translate-x-full"
+    )
+    : "flex flex-col h-full bg-white pixel-border-sm";
+
+  // Helper functions inside component
+  async function fetchMessages() {
+    let query = supabase
+      .from("Message")
+      .select(`
+        id,
+        content,
+        createdAt,
+        profileId,
+        mindMapNodeId,
+        profile:Profile(username, avatarUrl)
+      `)
+      .order("createdAt", { ascending: true });
+
+    if (candidateId) {
+      query = query.eq("candidateId", candidateId);
+    } else {
+      query = query.eq("projectId", projectId).is("candidateId", null);
+    }
+
+    const { data } = await query;
+    if (data) {
+      setMessages(data as any);
+    }
+  }
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentProfileId || !currentProfile) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: Message = {
+      id: tempId,
+      content: newMessage,
+      createdAt: new Date().toISOString(),
+      mindMapNodeId: replyToNode?.id || null,
+      profileId: currentProfileId,
+      profile: currentProfile
+    };
+
+    setMessages(prev => [...prev, optimisticMsg]);
+    const messageToSend = newMessage;
+    setNewMessage("");
+    if (onClearReply) onClearReply();
+
+    const payload = {
+      content: messageToSend,
+      projectId,
+      candidateId: candidateId || null,
+      profileId: currentProfileId,
+      mindMapNodeId: replyToNode?.id || null
+    };
+
+    const { error } = await supabase.from("Message").insert(payload);
+
+    if (error) {
+      console.error(error);
+      // Remove optimistic message if error?
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      alert("送信に失敗しました");
+    } else {
+      // Success. Realtime will trigger fetch, or we can fetch explicitly.
+      fetchMessages();
+    }
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm("コメントを削除しますか？")) return;
+
+    // Optimistic delete
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    setContextMenu(null);
+
+    const { error } = await supabase.from("Message").delete().eq("id", messageId);
+    if (error) {
+      // Revert? (Complex, fetching is easier)
+      fetchMessages();
+      alert("削除に失敗しました");
+    } else {
+      fetchMessages();
     }
   };
-
-  const handleSend = async () => {
-    if (!input.trim()) return;
-
-    // Simple mention detection
-    const mentionedUserIds = members
-      .filter(m => input.includes(`@${m.name}`))
-      .map(m => m.id);
-
-    try {
-      const res = await fetch(`/api/projects/${projectId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: input,
-          userId: currentUserId,
-          candidateId,
-          mentionedUserIds
-        })
-      });
-
-      if (res.ok) {
-        setInput('');
-        fetchMessages();
-        scrollToBottom();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setInput(val);
-
-    // Check if user just typed '@' at the end
-    if (val.endsWith('@') || val.endsWith('＠')) {
-      setShowMentions(true);
-    } else if (showMentions && val.includes(' ')) {
-      // Hide if space typed (simplistic)
-      setShowMentions(false);
-    }
-  };
-
-  const insertMention = (memberName: string) => {
-    setInput(prev => prev + memberName + ' ');
-    setShowMentions(false);
-    inputRef.current?.focus();
-  };
-
-  if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-transparent z-[90]"
-        onClick={onClose}
-      />
+      {/* Backdrop only for drawer */}
+      {isDrawer && (
+        <div
+          className={cn(
+            "fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity",
+            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          onClick={onClose}
+        />
+      )}
 
-      <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 z-[100] flex flex-col border-l border-gray-200 animate-slide-in">
+      {/* Container */}
+      <div className={containerClasses} onClick={() => setContextMenu(null)}>
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+        <div className="p-3 border-b-2 border-stone-100 flex justify-between items-center bg-stone-50">
           <div>
-            <div className="text-xs text-gray-500 uppercase font-bold tracking-wider">Chat</div>
-            <h3 className="font-bold text-gray-800 line-clamp-1 text-sm">{title}</h3>
+            <h3 className="font-bold text-sm leading-tight line-clamp-1">{title}</h3>
+            {isDrawer && <p className="text-[10px] text-stone-500">ディスカッション</p>}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-200 rounded text-gray-500">
-            <IoClose size={24} />
-          </button>
+          {isDrawer && (
+            <button onClick={onClose} className="p-1 hover:bg-stone-200 rounded">
+              <FaTimes />
+            </button>
+          )}
         </div>
+
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-100/50">
-          {messages.length === 0 && (
-            <div className="text-center text-gray-400 text-sm mt-10">No messages yet. Start the conversation!</div>
-          )}
-          {messages.map(msg => {
-            const isMe = msg.user.id === currentUserId;
-            return (
-              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${isMe ? 'bg-orange-500 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'}`}>
-                  {!isMe && <div className="text-xs font-bold mb-1 opacity-70">{msg.user.name}</div>}
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                  <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-orange-100' : 'text-gray-400'}`}>
-                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-grid-pattern relative">
+          {messages.length === 0 ? (
+            <div className="text-center text-stone-400 mt-10 text-xs">
+              <p>まだメッセージはありません。</p>
+              <p>議論を開始しましょう！</p>
+            </div>
+          ) : (
+            messages.map(msg => {
+              const isMine = msg.profileId === currentProfileId;
+              const isTemp = String(msg.id).startsWith('temp-');
+
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex gap-2 transition-colors rounded p-1 group relative",
+                    msg.mindMapNodeId ? "hover:bg-orange-50/50 cursor-pointer" : "hover:bg-stone-50/50",
+                    isTemp ? "opacity-70" : ""
+                  )}
+                  onMouseEnter={() => {
+                    if (onMessageHover && msg.mindMapNodeId) onMessageHover(msg.mindMapNodeId);
+                  }}
+                  onMouseLeave={() => {
+                    if (onMessageHover) onMessageHover(null);
+                  }}
+                  onContextMenu={(e) => {
+                    if (isMine && !isTemp) {
+                      e.preventDefault();
+                      setContextMenu({ x: e.clientX, y: e.clientY, messageId: msg.id });
+                    }
+                  }}
+                >
+                  <div className="w-6 h-6 bg-orange-100 rounded-full flex-shrink-0 pixel-border-sm flex items-center justify-center text-[10px] font-bold overflow-hidden mt-0.5">
+                    {msg.profile.avatarUrl ? <img src={msg.profile.avatarUrl} /> : msg.profile.username[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="font-bold text-[10px] truncate">{msg.profile.username}</span>
+                      <span className="text-[8px] text-stone-400 flex-shrink-0">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+
+                    {/* Related Node Context Indicator */}
+                    {msg.mindMapNodeId && (
+                      <div className="flex items-center gap-1 text-[9px] text-orange-600 mb-0.5 font-bold leading-none">
+                        <FaQuoteLeft className="text-[6px]" />
+                        <span>関連ノードあり</span>
+                      </div>
+                    )}
+
+                    <div className="bg-white p-2 pixel-border-sm text-xs break-words whitespace-pre-wrap leading-relaxed shadow-sm">
+                      {msg.content}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
+              );
+            })
+          )}
+          <div ref={bottomRef} />
         </div>
 
-        {/* Mention List Popup */}
-        {showMentions && (
-          <div className="absolute bottom-20 left-4 right-4 bg-white border rounded-lg shadow-xl max-h-40 overflow-y-auto z-10">
-            <div className="p-2 text-xs font-bold text-gray-500 bg-gray-50">Select Member</div>
-            {members.map(m => (
-              <button
-                key={m.id}
-                onClick={() => insertMention(m.name)}
-                className="w-full text-left px-3 py-2 hover:bg-orange-50 text-sm flex items-center gap-2"
-              >
-                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs overflow-hidden">
-                  {m.avatar ? <img src={m.avatar} alt={m.name} /> : m.name[0]}
-                </div>
-                {m.name}
-              </button>
-            ))}
+        {/* Context Menu for Message */}
+        {contextMenu && (
+          <div
+            className="fixed bg-white pixel-border-sm shadow-xl z-[100] py-1 min-w-[100px]"
+            style={{ top: contextMenu.y, left: contextMenu.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => handleDeleteMessage(contextMenu.messageId)}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2"
+            >
+              <FaTrash />
+              削除する
+            </button>
+          </div>
+        )}
+
+        {/* Reply Context Widget */}
+        {replyToNode && (
+          <div className="px-3 py-1.5 bg-orange-50 border-t border-orange-100 flex justify-between items-center text-[10px] text-orange-800">
+            <div className="flex items-center gap-2 max-w-[80%]">
+              <span className="font-bold bg-orange-200 px-1 rounded flex-shrink-0">@</span>
+              <span className="truncate">{replyToNode.label}</span>
+              <span>にコメント中</span>
+            </div>
+            <button
+              onClick={onClearReply}
+              className="p-1 hover:bg-orange-200 rounded-full"
+            >
+              <FaTimes />
+            </button>
           </div>
         )}
 
         {/* Input */}
-        <div className="p-3 border-t bg-white">
-          <div className="flex gap-2 items-end">
-            <textarea
+        <form onSubmit={handleSend} className="p-2 border-t-2 border-stone-100 bg-white">
+          <div className="flex gap-2">
+            <input
               ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              className="flex-1 border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none h-14 bg-gray-50"
-              placeholder="Type a message... Use @ to mention"
+              className="flex-1 bg-stone-50 pixel-border-sm px-2 py-1.5 text-xs focus:outline-none focus:bg-orange-50"
+              placeholder="メッセージ..."
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="p-3 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-            >
-              <IoSend size={20} />
-            </button>
+            <PixelButton type="submit" className="px-3 py-1 text-xs">
+              <FaPaperPlane />
+            </PixelButton>
           </div>
-        </div>
+        </form>
       </div>
     </>
   );

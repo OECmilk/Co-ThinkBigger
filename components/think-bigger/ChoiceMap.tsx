@@ -55,7 +55,7 @@ export function ChoiceMap() {
       )}
 
       <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">Step 4: 選択マップ (Choice Map)</h2>
+        <h2 className="text-xl font-bold mb-4 text-gray-800">Step 4: 選択マップ</h2>
         <p className="mb-6 text-sm text-gray-600">
           各構成要素に対して、既存の解決策を選択肢として洗い出しましょう。<br />
           <span className="text-green-600 font-bold">「領域外」</span>の事例は、革新的なアイデアの源泉になります。
@@ -99,8 +99,8 @@ export function ChoiceMap() {
                     <div
                       key={choice.id}
                       className={`group relative bg-white p-3 rounded shadow-sm border-l-4 transition-all hover:shadow-md ${choice.isOutsideDomain
-                          ? 'border-green-500 bg-green-50/30'
-                          : 'border-blue-400'
+                        ? 'border-green-500 bg-green-50/30'
+                        : 'border-blue-400'
                         }`}
                     >
                       <div className="flex justify-between items-start mb-1">
