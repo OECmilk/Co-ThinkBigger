@@ -8,7 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function SignupPage() {
+import { Suspense } from "react";
+
+function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -94,12 +96,20 @@ export default function SignupPage() {
 
           <div className="text-center text-sm">
             <span className="text-stone-500">すでにアカウントをお持ちですか？ </span>
-            <Link href="/login" className="text-[#f97316] font-bold hover:underline">
+            <Link href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="text-[#f97316] font-bold hover:underline">
               ログイン
             </Link>
           </div>
         </form>
       </PixelCard>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   );
 }
