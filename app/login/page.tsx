@@ -7,13 +7,15 @@ import Link from "next/link";
 import { FaGithub, FaGoogle, FaTwitter } from "react-icons/fa";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +29,7 @@ export default function LoginPage() {
     if (error) {
       alert("Login failed: " + error.message);
     } else {
-      router.push("/dashboard");
+      router.push(next || "/dashboard");
     }
     setLoading(false);
   };
@@ -102,7 +104,7 @@ export default function LoginPage() {
 
           <div className="text-center text-sm">
             <span className="text-stone-500">アカウントをお持ちでないですか？ </span>
-            <Link href="/signup" className="text-[#f97316] font-bold hover:underline">
+            <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="text-[#f97316] font-bold hover:underline">
               新規登録
             </Link>
           </div>

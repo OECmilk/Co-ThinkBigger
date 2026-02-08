@@ -6,7 +6,7 @@ import { PixelButton } from "@/components/ui/PixelButton";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -14,12 +14,15 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     const supabase = createClient();
 
+    // Signup logic...
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -47,10 +50,10 @@ export default function SignupPage() {
       }
 
       if (data.session) {
-        router.push("/dashboard");
+        router.push(next || "/dashboard");
       } else {
         alert("登録が完了しました！認証メールをご確認ください。");
-        router.push("/login");
+        router.push("/login?next=" + encodeURIComponent(next || "/dashboard"));
       }
     }
     setLoading(false);

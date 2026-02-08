@@ -32,13 +32,15 @@ export default async function DashboardPage() {
     if (!error) profile = newProfile;
   }
 
-  // Fetch Projects
+  // Fetch Projects where user is a member
   const { data: projects } = await supabase
     .from('Project')
     .select(`
       *,
+      myMembership:ProjectMember!inner(profileId),
       members:ProjectMember(count)
     `)
+    .eq('myMembership.profileId', profile.id)
     .order('updatedAt', { ascending: false });
 
   return (
