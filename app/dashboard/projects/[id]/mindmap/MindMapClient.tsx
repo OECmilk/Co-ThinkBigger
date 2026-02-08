@@ -68,20 +68,20 @@ const CustomNode = ({ data, selected }: NodeProps) => {
 
   return (
     <div className={cn(
-      "px-2 py-1 rounded-md shadow-sm border text-center bg-white transition-all group relative max-w-[200px]",
-      selected ? "border-[#f97316] ring-1 ring-orange-200" :
+      "px-6 py-4 rounded-lg shadow-sm border text-center bg-white transition-all group relative max-w-[320px] min-w-[120px]",
+      selected ? "border-[#f97316] ring-2 ring-orange-200" :
         data.isHighlighted ? "border-[#f97316] ring-4 ring-orange-400/50 scale-110 z-50 shadow-xl" : "border-stone-200",
       data.scope === 'personal' ? "bg-blue-50/50" : "bg-white"
     )}>
       {/* Handles for connections - Grey and explicit IDs */}
       {/* Top: Target, Bottom: Source, Left: Target, Right: Source */}
-      <Handle type="target" position={Position.Top} id="top" className="!w-2 !h-2 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="source" position={Position.Bottom} id="bottom" className="!w-2 !h-2 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="target" position={Position.Left} id="left" className="!w-2 !h-2 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <Handle type="source" position={Position.Right} id="right" className="!w-2 !h-2 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="target" position={Position.Top} id="top" className="!w-3 !h-3 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="source" position={Position.Bottom} id="bottom" className="!w-3 !h-3 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="target" position={Position.Left} id="left" className="!w-3 !h-3 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <Handle type="source" position={Position.Right} id="right" className="!w-3 !h-3 !bg-stone-300 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
 
       {/* Author Avatar/Initial */}
-      <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-3 h-3 rounded-full bg-stone-200 text-[6px] font-bold border border-white shadow-sm" title={data.authorName as string}>
+      <div className="absolute -top-3 -right-3 flex items-center justify-center w-6 h-6 rounded-full bg-stone-200 text-[10px] font-bold border-2 border-white shadow-sm" title={data.authorName as string}>
         {(data.authorAvatar as string) ? (
           <img src={data.authorAvatar as string} className="w-full h-full rounded-full object-cover" />
         ) : (
@@ -97,11 +97,11 @@ const CustomNode = ({ data, selected }: NodeProps) => {
           onBlur={onBlur}
           onKeyDown={onKeyDown}
           onInput={onInput}
-          className="text-[10px] font-medium text-center bg-transparent focus:outline-none min-w-[20px] whitespace-pre-wrap outline-none leading-tight break-words nodrag cursor-text"
-          style={{ minHeight: '1em' }}
+          className="text-sm font-medium text-center bg-transparent focus:outline-none min-w-[60px] whitespace-pre-wrap outline-none leading-relaxed break-words nodrag cursor-text"
+          style={{ minHeight: '1.5em' }}
         />
       ) : (
-        <div onDoubleClick={onLabelClick} className="text-[10px] font-medium cursor-text break-words leading-tight whitespace-pre-wrap min-h-[1em] min-w-[20px] nodrag">
+        <div onDoubleClick={onLabelClick} className="text-sm font-medium cursor-text break-words leading-relaxed whitespace-pre-wrap min-h-[1.5em] min-w-[60px] nodrag">
           {label}
         </div>
       )}

@@ -34,7 +34,8 @@ export default function MembersClient({
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const inviteUrl = typeof window !== "undefined" ? `${window.location.origin}/invite/${inviteCode}` : "";
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== "undefined" ? window.location.origin : "");
+  const inviteUrl = origin ? `${origin}/invite/${inviteCode}` : "";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteUrl);
