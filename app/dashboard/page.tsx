@@ -1,22 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSupabase, getProfile, getUser } from "@/lib/auth";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { PixelButton } from "@/components/ui/PixelButton";
 import Link from "next/link";
 import { FaPlus, FaFolderOpen } from "react-icons/fa";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const supabase = await getSupabase();
+
+  // layout が取得済みのものがキャッシュから返る
+  const [user, cachedProfile] = await Promise.all([getUser(), getProfile()]);
 
   if (!user) return null;
 
   // Ensure Profile exists (lazy creation fallback if trigger failed/not set)
   // Ideally this is handled by database triggers
-  let { data: profile } = await supabase
-    .from('Profile')
-    .select('*')
-    .eq('userId', user.id)
-    .single();
+  let profile: { id: string } | null = cachedProfile;
 
   if (!profile) {
     const { data: newProfile, error } = await supabase
@@ -31,6 +29,8 @@ export default async function DashboardPage() {
 
     if (!error) profile = newProfile;
   }
+
+  if (!profile) return null;
 
   // Fetch Projects where user is a member
   const { data: projects } = await supabase

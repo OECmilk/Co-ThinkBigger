@@ -49,6 +49,55 @@ const manageSteps = (id: string) => [
   { id: "members", label: "メンバー管理", icon: FaUsers, href: `/dashboard/projects/${id}/members` },
 ];
 
+/**
+ * ナビゲーション 1 項目。
+ *
+ * ホバー／フォーカス／タップ開始の時点で prefetch={true} に切り替え、
+ * 「これから押されそうなページ」だけをサーバーから先読みしておく。
+ * 全リンクを最初から full prefetch すると Supabase への問い合わせが
+ * 一気に 7 本走ってしまうので、直前に絞っている。
+ */
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  isActive,
+  isCollapsed,
+  iconBaseClass = "text-stone-400",
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+  isCollapsed: boolean;
+  iconBaseClass?: string;
+}) {
+  const [shouldPrefetch, setShouldPrefetch] = useState(false);
+  const warm = () => setShouldPrefetch(true);
+
+  return (
+    <Link
+      href={href}
+      prefetch={shouldPrefetch ? true : undefined}
+      onMouseEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-3 px-3 py-3 rounded pixel-border-sm hover:bg-stone-50 transition-colors cursor-pointer bg-white group",
+          isCollapsed ? "justify-center" : "",
+          isActive ? "bg-stone-100 ring-2 ring-stone-200" : ""
+        )}
+        title={isCollapsed ? label : ""}
+      >
+        <Icon className={cn(iconBaseClass, "text-lg group-hover:text-[#f97316] transition-colors", isActive && "text-[#f97316]")} />
+        {!isCollapsed && <span className="text-sm font-bold">{label}</span>}
+      </div>
+    </Link>
+  );
+}
+
 export function ProjectSidebar({ projectId, projectName }: { projectId: string, projectName: string }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
@@ -101,65 +150,44 @@ export function ProjectSidebar({ projectId, projectName }: { projectId: string, 
       {/* Discover Section */}
       <nav className="space-y-2 mb-8">
         <h3 className={cn("text-[10px] font-bold text-stone-400 mb-2 px-2 transition-opacity whitespace-nowrap", isCollapsed && "opacity-0")}>DISCOVER</h3>
-        <Link href={`/dashboard/projects/${projectId}/mindmap`}>
-          <div
-            className={cn(
-              "flex items-center gap-3 px-3 py-3 rounded pixel-border-sm hover:bg-stone-50 transition-colors cursor-pointer bg-white group relative",
-              isCollapsed ? "justify-center" : "",
-              pathname.includes('mindmap') ? "bg-stone-100 ring-2 ring-stone-200" : ""
-            )}
-            title={isCollapsed ? "マインドマップ" : ""}
-          >
-            <FaHeart className={cn("text-stone-400 text-lg group-hover:text-[#f97316] transition-colors", pathname.includes('mindmap') && "text-[#f97316]")} />
-            {!isCollapsed && <span className="text-sm font-bold">マインドマップ</span>}
-          </div>
-        </Link>
+        <NavItem
+          href={`/dashboard/projects/${projectId}/mindmap`}
+          label="マインドマップ"
+          icon={FaHeart}
+          isActive={pathname.includes('mindmap')}
+          isCollapsed={isCollapsed}
+        />
       </nav>
 
       {/* Method Section */}
       <nav className="space-y-2 mb-8">
         <h3 className={cn("text-[10px] font-bold text-stone-400 mb-2 px-2 transition-opacity whitespace-nowrap", isCollapsed && "opacity-0")}>THINK BIGGER</h3>
-        {steps.map((step) => {
-          const isActive = pathname.includes(step.id);
-          return (
-            <Link key={step.id} href={step.href}>
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded pixel-border-sm hover:bg-stone-50 transition-colors cursor-pointer bg-white group",
-                  isCollapsed ? "justify-center" : "",
-                  isActive ? "bg-stone-100 ring-2 ring-stone-200" : ""
-                )}
-                title={isCollapsed ? step.label : ""}
-              >
-                <step.icon className={cn("text-stone-400 text-lg group-hover:text-[#f97316] transition-colors", isActive && "text-[#f97316]")} />
-                {!isCollapsed && <span className="text-sm font-bold">{step.label}</span>}
-              </div>
-            </Link>
-          );
-        })}
+        {steps.map((step) => (
+          <NavItem
+            key={step.id}
+            href={step.href}
+            label={step.label}
+            icon={step.icon}
+            isActive={pathname.includes(step.id)}
+            isCollapsed={isCollapsed}
+          />
+        ))}
       </nav>
 
       {/* Management Section */}
       <nav className={cn("space-y-2 mt-auto md:mt-0 pt-4 md:pt-4 border-t-2 border-dashed border-stone-200", isCollapsed && "border-none pt-2")}>
         <h3 className={cn("text-[10px] font-bold text-stone-400 mb-2 px-2 transition-opacity whitespace-nowrap", isCollapsed && "opacity-0")}>管理</h3>
-        {management.map((step) => {
-          const isActive = pathname.includes(step.id);
-          return (
-            <Link key={step.id} href={step.href}>
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded pixel-border-sm hover:bg-stone-50 transition-colors cursor-pointer bg-white group",
-                  isCollapsed ? "justify-center" : "",
-                  isActive ? "bg-stone-100 ring-2 ring-stone-200" : ""
-                )}
-                title={isCollapsed ? step.label : ""}
-              >
-                <step.icon className={cn("text-stone-700 text-lg group-hover:text-[#f97316] transition-colors", isActive && "text-[#f97316]")} />
-                {!isCollapsed && <span className="text-sm font-bold">{step.label}</span>}
-              </div>
-            </Link>
-          );
-        })}
+        {management.map((step) => (
+          <NavItem
+            key={step.id}
+            href={step.href}
+            label={step.label}
+            icon={step.icon}
+            isActive={pathname.includes(step.id)}
+            isCollapsed={isCollapsed}
+            iconBaseClass="text-stone-700"
+          />
+        ))}
       </nav>
     </aside>
   );

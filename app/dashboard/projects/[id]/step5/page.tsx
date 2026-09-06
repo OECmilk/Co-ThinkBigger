@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSupabase, getUser } from "@/lib/auth";
 import Step5Client from "./Step5Client";
 import { redirect } from "next/navigation";
 
@@ -8,12 +8,12 @@ export default async function Step5Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const supabase = await getSupabase();
 
   // Fetch Data (Parallel)
-  const [subProblemsRes, solutionsRes] = await Promise.all([
+  const [user, subProblemsRes, solutionsRes] = await Promise.all([
+    getUser(),
+
     supabase
       .from("SubProblem")
       .select(`
@@ -29,6 +29,8 @@ export default async function Step5Page({
       .eq("projectId", id)
       .order("createdAt", { ascending: false })
   ]);
+
+  if (!user) redirect("/login");
 
   return (
     <Step5Client

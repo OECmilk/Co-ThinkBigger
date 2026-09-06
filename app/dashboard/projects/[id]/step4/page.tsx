@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSupabase, getProfile } from "@/lib/auth";
 import Step4Client from "./Step4Client";
 import { redirect } from "next/navigation";
 
@@ -8,34 +8,29 @@ export default async function Step4Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const supabase = await getSupabase();
 
-  // Fetch Profile
-  const { data: profile } = await supabase
-    .from("Profile")
-    .select("id")
-    .eq("userId", user.id)
-    .single();
+  const [profile, subProblemsRes] = await Promise.all([
+    getProfile(),
+
+    // Fetch SubProblems with Choices
+    supabase
+      .from("SubProblem")
+      .select(`
+        *,
+        choices:Choice(*)
+      `)
+      .eq("projectId", id)
+      .order("order", { ascending: true })
+      .order("createdAt", { ascending: true }),
+  ]);
 
   if (!profile) redirect("/login");
-
-  // Fetch SubProblems with Choices
-  const { data: subProblems } = await supabase
-    .from("SubProblem")
-    .select(`
-      *,
-      choices:Choice(*)
-    `)
-    .eq("projectId", id)
-    .order("order", { ascending: true })
-    .order("createdAt", { ascending: true });
 
   return (
     <Step4Client
       projectId={id}
-      subProblems={subProblems || []}
+      subProblems={subProblemsRes.data || []}
       currentProfileId={profile.id}
     />
   );

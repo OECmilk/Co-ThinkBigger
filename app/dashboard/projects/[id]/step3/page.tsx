@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSupabase, getProfile } from "@/lib/auth";
 import Step3Client from "./Step3Client";
 import { redirect } from "next/navigation";
 
@@ -8,30 +8,25 @@ export default async function Step3Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const supabase = await getSupabase();
 
-  // Fetch Profile
-  const { data: profile } = await supabase
-    .from("Profile")
-    .select("id")
-    .eq("userId", user.id)
-    .single();
+  const [profile, desiresRes] = await Promise.all([
+    getProfile(),
+
+    // Fetch Desires
+    supabase
+      .from("Desire")
+      .select("*")
+      .eq("projectId", id)
+      .order("createdAt", { ascending: true }),
+  ]);
 
   if (!profile) redirect("/login");
-
-  // Fetch Desires
-  const { data: desires } = await supabase
-    .from("Desire")
-    .select("*")
-    .eq("projectId", id)
-    .order("createdAt", { ascending: true });
 
   return (
     <Step3Client
       projectId={id}
-      desires={(desires || []) as any[]} // Type cast to match Client types if needed
+      desires={(desiresRes.data || []) as any[]}
       currentProfileId={profile.id}
     />
   );

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getProfile, getUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PixelButton } from "@/components/ui/PixelButton";
@@ -10,18 +10,15 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // getUser / getProfile はリクエスト単位でメモ化されているため、
+  // 配下の layout / page が同じものを呼んでも往復は増えない。
+  const user = await getUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("Profile")
-    .select("id, avatarUrl")
-    .eq("userId", user.id)
-    .single();
+  const profile = await getProfile();
 
   return (
     <div className="min-h-screen flex flex-col bg-grid-pattern">

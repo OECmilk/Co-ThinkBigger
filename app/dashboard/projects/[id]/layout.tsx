@@ -1,8 +1,6 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getProjectMembership, getProjectMeta, getUser } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { ProjectSidebar } from "@/components/input/ProjectSidebar";
-import { cn } from "@/lib/utils";
 
 export default async function ProjectLayout({
   children,
@@ -12,41 +10,21 @@ export default async function ProjectLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  // 1. Check Project Existence & Membership
-  const { data: { user } } = await supabase.auth.getUser();
+  // 親の dashboard/layout.tsx で取得済みのユーザーがキャッシュから返る
+  const user = await getUser();
   if (!user) redirect("/login");
 
-  // First fetch profile id for the user
-  const { data: profile } = await supabase.from('Profile').select('id').eq('userId', user.id).single();
-
-  if (!profile) {
-    // Should resolve by auto-creation, but if not:
-    notFound();
-  }
-
-  const { data: member } = await supabase
-    .from("ProjectMember")
-    .select("role")
-    .eq("projectId", id)
-    .eq("profileId", profile.id) // Use profileId directly
-    .single();
+  // メンバーシップ確認とプロジェクト情報は互いに依存しないので並列に取る
+  const [member, project] = await Promise.all([
+    getProjectMembership(id),
+    getProjectMeta(id),
+  ]);
 
   if (!member) {
-    // Check if project exists but user is not a member -> specific error page or notFound
-    // For now, simpler handling:
+    // プロジェクトが存在しない、またはユーザーがメンバーでない
     notFound();
   }
-
-  // 2. Fetch Project Meta
-  const { data: project } = await supabase
-    .from("Project")
-    .select("name")
-    .eq("id", id)
-    .single();
-
-
 
   return (
     <div className="flex flex-col md:flex-row h-full min-h-[calc(100vh-64px)]">
