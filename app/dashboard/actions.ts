@@ -1,6 +1,7 @@
 "use server";
 
 import { getProfile, getSupabase } from "@/lib/auth";
+import { addCandidate, addDesire, addSubProblem } from "@/app/dashboard/projects/[id]/actions";
 
 export type NotificationItem = {
   id: string;
@@ -61,4 +62,29 @@ export async function markNotificationsRead(ids: string[]) {
     .update({ read: true })
     .eq("profileId", profile.id)
     .in("id", ids);
+}
+
+/* ============================================================
+ * ホームからの1行入力
+ *
+ * 毎日ひらいてもらうには、開いた画面でそのまま手が動くことが要る。
+ * ステップごとの追加処理をここで振り分けて、
+ * ホームから1行書くだけで今日の記録が残るようにする。
+ * ========================================================== */
+
+export type QuickAddResult = { error?: string; success?: true; unlocked?: { label: string; icon: string }[] };
+
+export async function quickAdd(
+  projectId: string,
+  step: string,
+  text: string
+): Promise<QuickAddResult> {
+  const value = text.trim();
+  if (!value) return { error: "内容を入力してください。" };
+
+  if (step === "step1") return addCandidate(projectId, value);
+  if (step === "step2") return addSubProblem(projectId, value);
+  if (step === "step3") return addDesire(projectId, "self", value);
+
+  return { error: "このステップはホームから直接追加できません。ステップを開いてください。" };
 }

@@ -6,7 +6,10 @@ import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelInput } from "@/components/ui/PixelInput";
 import { PixelCard } from "@/components/ui/PixelCard";
 import { addCandidate, rateCandidate, setMainProblem, updateCandidate, deleteCandidate } from "../actions";
-import { FaPaperPlane, FaFire, FaRegCommentDots, FaCrown, FaEdit, FaTrash, FaTimes, FaSave } from "react-icons/fa";
+import {
+  FaPaperPlane, FaFire, FaRegCommentDots, FaCrown, FaEdit, FaTrash, FaTimes, FaSave,
+  FaNewspaper, FaLightbulb,
+} from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { AuthorStamp, type Author } from "@/components/project/Authorship";
@@ -14,6 +17,9 @@ import { StepHeader, StepFooterNav, EmptyState } from "@/components/project/Step
 import { useAction } from "@/components/ui/useAction";
 import { useFeedback } from "@/components/ui/Feedback";
 import { Spinner } from "@/components/ui/Spinner";
+import { CandidateSeed } from "@/components/ai/CandidateSeed";
+import { TopicBoard } from "@/components/ai/TopicBoard";
+import { AiSuggest } from "@/components/ai/AiSuggest";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
 type Candidate = {
@@ -32,6 +38,7 @@ export default function Step1Client({
   progress,
   candidates,
   currentProfileId,
+  aiReady,
   mainProblem,
   totalMembers,
 }: {
@@ -40,6 +47,7 @@ export default function Step1Client({
   progress: ProjectProgress;
   candidates: Candidate[];
   currentProfileId: string;
+  aiReady: boolean;
   mainProblem: string;
   totalMembers: number;
 }) {
@@ -47,6 +55,11 @@ export default function Step1Client({
   const [activeChat, setActiveChat] = useState<{ id: string; title: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+
+  // 「思いつかない」ときの導線。ニュースの見出しを AI への種として渡せる。
+  const [seedHint, setSeedHint] = useState("");
+  const [seedKey, setSeedKey] = useState(0);
+  const [showTopics, setShowTopics] = useState(false);
 
   /**
    * 関心度は「押した瞬間に色が変わる」ことが大事なので、
@@ -138,6 +151,53 @@ export default function Step1Client({
             {isBusy("add-candidate") ? <Spinner size={14} /> : <FaPaperPlane />}
           </PixelButton>
         </form>
+
+        {/* 手が止まったときの逃げ道を、入力欄のすぐ下に置く */}
+        <section className="panel p-4 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--ink-2)]">
+            <FaLightbulb className="text-[var(--accent)]" />
+            思いつかないときは
+          </div>
+
+          <div className="flex flex-wrap items-start gap-2">
+            <CandidateSeed
+              projectId={projectId}
+              aiReady={aiReady}
+              hint={seedHint}
+              onHintChange={setSeedHint}
+              autoOpenKey={seedKey}
+            />
+            <button
+              onClick={() => setShowTopics((v) => !v)}
+              className="press inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-[3px] border-2 border-dashed border-[var(--line)] bg-white text-[var(--ink-2)] hover:border-[var(--ink-3)] transition-colors"
+            >
+              <FaNewspaper />
+              {showTopics ? "世の中のいまを閉じる" : "世の中のいまを見る"}
+            </button>
+            {mainProblem && (
+              <AiSuggest
+                projectId={projectId}
+                aiReady={aiReady}
+                single
+                title="課題の問い直し"
+                triggerLabel="いまの課題を問い直す"
+                buildRequest={() => ({ kind: "reframe" })}
+                buildAdopt={(selected) => ({ kind: "reframe", text: selected[0].text })}
+                className="w-full"
+              />
+            )}
+          </div>
+
+          {showTopics && (
+            <TopicBoard
+              className="animate-rise"
+              onPick={(title) => {
+                setSeedHint(title);
+                setSeedKey((k) => k + 1);
+              }}
+            />
+          )}
+        </section>
 
         {candidates.length === 0 ? (
           <EmptyState

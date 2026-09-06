@@ -2,7 +2,7 @@ import { getProfile, getUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { PixelButton } from "@/components/ui/PixelButton";
-import { FaSignOutAlt } from "react-icons/fa";
+import { FaSignOutAlt, FaPlug, FaHome } from "react-icons/fa";
 import { ProfileLink } from "@/components/ProfileLink";
 import { FeedbackProvider } from "@/components/ui/Feedback";
 import { NotificationBell } from "@/components/project/NotificationBell";
@@ -26,15 +26,28 @@ export default async function DashboardLayout({
     // 操作結果のトーストと確認ダイアログをアプリ全体で共有する
     <FeedbackProvider>
       <div className="min-h-screen flex flex-col bg-grid-pattern">
-        <header className="border-b-4 border-stone-800 bg-white sticky top-0 z-50">
+        <header className="border-b-2 border-[var(--line-strong)] bg-white sticky top-0 z-50">
           <div className="w-full px-4 h-16 flex justify-between items-center gap-4">
-            <Link href="/dashboard" className="text-lg md:text-xl font-bold tracking-widest text-[#f97316] shrink-0">
-              <span className="text-stone-800">CO-</span>THINK BIGGER
+            <Link
+              href="/dashboard"
+              className="text-base md:text-lg font-bold tracking-widest text-[var(--accent)] shrink-0 flex items-center gap-2 font-display"
+            >
+              <FaHome className="text-[var(--ink)] text-sm" />
+              <span className="text-[var(--ink)]">CO-</span>THINK BIGGER
             </Link>
 
             <div className="flex items-center gap-3 md:gap-4">
               {/* 自分がいない間にチームで起きたことの入口 */}
               {profile && <NotificationBell profileId={String(profile.id)} />}
+
+              <Link
+                href="/dashboard/settings"
+                className="p-2 pixel-border-sm bg-white hover:bg-[var(--surface-2)] transition-colors"
+                title="AI接続などの設定"
+                aria-label="設定"
+              >
+                <FaPlug className="text-[var(--ink-2)]" />
+              </Link>
 
               <ProfileLink profile={profile} user={user} />
 

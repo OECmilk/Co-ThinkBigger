@@ -1,5 +1,6 @@
 import { getSupabase, getProfile } from "@/lib/auth";
 import { getProjectProgress, getProjectSnapshot } from "@/lib/project";
+import { getAiStatus } from "@/lib/ai/client";
 import Step1Client from "./Step1Client";
 import { redirect } from "next/navigation";
 
@@ -7,10 +8,11 @@ export default async function Step1Page({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const supabase = await getSupabase();
 
-  const [profile, snapshot, progress, candidatesRes] = await Promise.all([
+  const [profile, snapshot, progress, aiStatus, candidatesRes] = await Promise.all([
     getProfile(),
     getProjectSnapshot(id),
     getProjectProgress(id),
+    getAiStatus(),
     supabase
       .from("Candidate")
       .select(
@@ -48,6 +50,7 @@ export default async function Step1Page({ params }: { params: Promise<{ id: stri
       progress={progress}
       candidates={candidates}
       currentProfileId={String(profile.id)}
+      aiReady={aiStatus.configured}
       mainProblem={snapshot.description}
       totalMembers={Math.max(snapshot.members.length, 1)}
     />

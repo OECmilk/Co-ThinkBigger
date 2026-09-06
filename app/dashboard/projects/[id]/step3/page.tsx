@@ -1,15 +1,17 @@
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/auth";
 import { getProjectProgress, getProjectSnapshot } from "@/lib/project";
+import { getAiStatus } from "@/lib/ai/client";
 import Step3Client from "./Step3Client";
 
 export default async function Step3Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [profile, snapshot, progress] = await Promise.all([
+  const [profile, snapshot, progress, aiStatus] = await Promise.all([
     getProfile(),
     getProjectSnapshot(id),
     getProjectProgress(id),
+    getAiStatus(),
   ]);
 
   if (!profile) redirect("/login");
@@ -32,6 +34,7 @@ export default async function Step3Page({ params }: { params: Promise<{ id: stri
       step={progress.steps[2]}
       progress={progress}
       mainProblem={snapshot.description}
+      aiReady={aiStatus.configured}
       desires={desires}
     />
   );

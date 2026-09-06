@@ -3,20 +3,23 @@ import React from "react";
 
 interface PixelCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
+  /** raised: 太枠＋段差影 / flat: 薄枠＋淡い影（情報量が多い画面向け） */
+  tone?: "raised" | "flat";
   children: React.ReactNode;
 }
 
-export function PixelCard({ className, title, children, ...props }: PixelCardProps) {
+export function PixelCard({ className, title, tone = "flat", children, ...props }: PixelCardProps) {
   return (
     <div
       className={cn(
-        "bg-white pixel-border p-6 relative",
+        tone === "raised" ? "card-raised" : "card",
+        "p-5 relative",
         className
       )}
       {...props}
     >
       {title && (
-        <div className="absolute -top-4 left-4 bg-white border-2 border-stone-800 px-2 py-1 text-sm font-bold uppercase tracking-wider">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)] mb-3 font-display">
           {title}
         </div>
       )}

@@ -10,6 +10,7 @@ import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/componen
 import { useAction } from "@/components/ui/useAction";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
+import { AiSuggest } from "@/components/ai/AiSuggest";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
 type SubProblem = {
@@ -26,12 +27,14 @@ export default function Step2Client({
   step,
   progress,
   mainProblem,
+  aiReady,
   subProblems,
 }: {
   projectId: string;
   step: StepProgress;
   progress: ProjectProgress;
   mainProblem: string;
+  aiReady: boolean;
   subProblems: SubProblem[];
 }) {
   const [description, setDescription] = useState(mainProblem || "");
@@ -154,6 +157,31 @@ export default function Step2Client({
           </p>
         )}
       </div>
+
+      {/* 分解に詰まったとき用。AI の案は必ず「自分の下書き」として入る */}
+      {mainProblem && (
+        <div className="flex flex-wrap gap-2">
+          <AiSuggest
+            projectId={projectId}
+            aiReady={aiReady}
+            title="サブ課題の提案"
+            triggerLabel="AIに分解してもらう"
+            buildRequest={() => ({ kind: "subProblems" })}
+            buildAdopt={(selected) => ({ kind: "subProblems", texts: selected.map((s) => s.text) })}
+            className="flex-1 min-w-[260px]"
+          />
+          <AiSuggest
+            projectId={projectId}
+            aiReady={aiReady}
+            single
+            title="課題の問い直し"
+            triggerLabel="そもそも課題を問い直す"
+            buildRequest={() => ({ kind: "reframe" })}
+            buildAdopt={(selected) => ({ kind: "reframe", text: selected[0].text })}
+            className="flex-1 min-w-[260px]"
+          />
+        </div>
+      )}
 
       <div className="bg-white pixel-border-sm">
         <PersonalTeamTabs

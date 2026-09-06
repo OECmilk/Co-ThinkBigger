@@ -11,6 +11,7 @@ import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/componen
 import { useAction } from "@/components/ui/useAction";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
+import { AiSuggest } from "@/components/ai/AiSuggest";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
 type Choice = {
@@ -31,12 +32,14 @@ export default function Step4Client({
   step,
   progress,
   mainProblem,
+  aiReady,
   rows,
 }: {
   projectId: string;
   step: StepProgress;
   progress: ProjectProgress;
   mainProblem: string;
+  aiReady: boolean;
   rows: Row[];
 }) {
   const [activeTab, setActiveTab] = useState<"personal" | "team">("personal");
@@ -165,6 +168,39 @@ export default function Step4Client({
                           {choices.length} 件
                         </span>
                       </div>
+
+                      {activeTab === "personal" && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <AiSuggest
+                            projectId={projectId}
+                            aiReady={aiReady}
+                            compact
+                            title={"「" + row.title + "」の領域外事例"}
+                            triggerLabel="別分野の事例をAIに探してもらう"
+                            buildRequest={() => ({ kind: "choices", subProblemId: row.id, wantOutside: true })}
+                            buildAdopt={(selected) => ({
+                              kind: "choices",
+                              subProblemId: row.id,
+                              items: selected.map((s) => ({ text: s.text, isOutsideDomain: true })),
+                            })}
+                            className="w-full"
+                          />
+                          <AiSuggest
+                            projectId={projectId}
+                            aiReady={aiReady}
+                            compact
+                            title={"「" + row.title + "」の定番事例"}
+                            triggerLabel="同じ分野の定番を探す"
+                            buildRequest={() => ({ kind: "choices", subProblemId: row.id, wantOutside: false })}
+                            buildAdopt={(selected) => ({
+                              kind: "choices",
+                              subProblemId: row.id,
+                              items: selected.map((s) => ({ text: s.text, isOutsideDomain: false })),
+                            })}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-3 items-start">
                         {choices.map((choice) => (

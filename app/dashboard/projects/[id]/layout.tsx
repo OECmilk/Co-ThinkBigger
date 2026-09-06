@@ -1,8 +1,10 @@
 import { getProjectMembership, getUser } from "@/lib/auth";
 import { getProjectProgress, getProjectSnapshot } from "@/lib/project";
+import { getAiStatus } from "@/lib/ai/client";
 import { redirect, notFound } from "next/navigation";
 import { ProjectSidebar } from "@/components/input/ProjectSidebar";
 import { ProjectRealtime } from "@/components/project/ProjectRealtime";
+import { CoachDock } from "@/components/ai/CoachDock";
 
 export default async function ProjectLayout({
   children,
@@ -16,7 +18,11 @@ export default async function ProjectLayout({
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const [member, snapshot] = await Promise.all([getProjectMembership(id), getProjectSnapshot(id)]);
+  const [member, snapshot, aiStatus] = await Promise.all([
+    getProjectMembership(id),
+    getProjectSnapshot(id),
+    getAiStatus(),
+  ]);
   if (!member) notFound();
 
   // スナップショットは配下のページでも使い回されるため、ここでの取得は 1 回きり
@@ -30,6 +36,9 @@ export default async function ProjectLayout({
 
       {/* 他のメンバーの変更を自動で取り込む */}
       <ProjectRealtime projectId={id} />
+
+      {/* どのステップからでも呼べる AI 壁打ち */}
+      <CoachDock projectId={id} aiReady={aiStatus.configured} />
     </div>
   );
 }

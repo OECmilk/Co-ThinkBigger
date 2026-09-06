@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getProfile, getProjectMembership, getSupabase } from "@/lib/auth";
 import { notifyProjectMembers } from "@/lib/notifications";
 import { BADGE_LEVELS, getBadge, type BadgeType } from "@/lib/badges";
+import { bumpActivity } from "@/lib/streak";
 
 /**
  * すべての server action は例外を投げずに { error } を返す規約に統一する。
@@ -112,6 +113,7 @@ export async function addCandidate(projectId: string, title: string): Promise<Ac
   });
   if (insertError) return fail("課題候補の追加に失敗しました。");
 
+  await bumpActivity(profile!.id);
   const unlocked = await unlockAchievements(profile!.id, profile!.userId, "CANDIDATE");
 
   await notifyProjectMembers({
@@ -233,6 +235,7 @@ export async function addSubProblem(projectId: string, title: string): Promise<A
   });
   if (insertError) return fail("サブ課題の追加に失敗しました。");
 
+  await bumpActivity(profile!.id);
   const unlocked = await unlockAchievements(profile!.id, profile!.userId, "SUBPROBLEM");
   revalidateProject(projectId, "step2");
   return { success: true, unlocked };
@@ -360,6 +363,7 @@ export async function addDesire(
   });
   if (insertError) return fail("望みの追加に失敗しました。");
 
+  await bumpActivity(profile!.id);
   const unlocked = await unlockAchievements(profile!.id, profile!.userId, "DESIRE");
   revalidateProject(projectId, "step3");
   return { success: true, unlocked };
@@ -411,6 +415,7 @@ export async function addChoice(
   });
   if (insertError) return fail("先行事例の追加に失敗しました。");
 
+  await bumpActivity(profile!.id);
   const unlocked = await unlockAchievements(profile!.id, profile!.userId, "CHOICE");
   revalidateProject(projectId, "step4", "step5");
   return { success: true, unlocked };
@@ -479,6 +484,7 @@ export async function saveSolution(
   }
   if (insertError) return fail("解決策の保存に失敗しました。");
 
+  await bumpActivity(profile!.id);
   const unlocked = await unlockAchievements(profile!.id, profile!.userId, "SOLUTION");
 
   await notifyProjectMembers({
@@ -534,7 +540,7 @@ export async function toggleEvaluation(
   desireId: string,
   projectId: string
 ): Promise<ActionResult> {
-  const { error } = await requireMember(projectId);
+  const { error, profile } = await requireMember(projectId);
   if (error) return fail(error);
 
   const supabase = await getSupabase();
@@ -551,6 +557,7 @@ export async function toggleEvaluation(
 
   if (result.error) return fail("評価の更新に失敗しました。");
 
+  await bumpActivity(profile!.id);
   revalidateProject(projectId, "step6");
   return { success: true };
 }

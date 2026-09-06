@@ -13,6 +13,7 @@ import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/componen
 import { useAction } from "@/components/ui/useAction";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
+import { AiSuggest } from "@/components/ai/AiSuggest";
 import type { DesireType, ProjectProgress, StepProgress } from "@/lib/project";
 
 type Desire = {
@@ -42,12 +43,14 @@ export default function Step3Client({
   step,
   progress,
   mainProblem,
+  aiReady,
   desires,
 }: {
   projectId: string;
   step: StepProgress;
   progress: ProjectProgress;
   mainProblem: string;
+  aiReady: boolean;
   desires: Desire[];
 }) {
   const [selectedType, setSelectedType] = useState<DesireType>("self");
@@ -238,6 +241,22 @@ export default function Step3Client({
                   ))
                 )}
               </div>
+
+              {activeTab === "personal" && (
+                <AiSuggest
+                  projectId={projectId}
+                  aiReady={aiReady}
+                  title={TITLES[selectedType] + "の望みの提案"}
+                  triggerLabel={"AIに「" + TITLES[selectedType] + "」の望みを挙げてもらう"}
+                  buildRequest={() => ({ kind: "desires", desireType: selectedType })}
+                  buildAdopt={(selected) => ({
+                    kind: "desires",
+                    desireType: selectedType,
+                    texts: selected.map((s) => s.text),
+                  })}
+                  className="mb-3"
+                />
+              )}
 
               {activeTab === "personal" && (
                 <form onSubmit={handleSubmit} className="mt-auto flex gap-2">
