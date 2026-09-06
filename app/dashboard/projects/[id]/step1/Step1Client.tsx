@@ -13,6 +13,7 @@ import { AuthorStamp, type Author } from "@/components/project/Authorship";
 import { StepHeader, StepFooterNav, EmptyState } from "@/components/project/StepScaffold";
 import { useAction } from "@/components/ui/useAction";
 import { useFeedback } from "@/components/ui/Feedback";
+import { Spinner } from "@/components/ui/Spinner";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
 type Candidate = {
@@ -47,7 +48,15 @@ export default function Step1Client({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
-  const { run, isPending } = useAction();
+  /**
+   * 関心度は「押した瞬間に色が変わる」ことが大事なので、
+   * サーバーの往復を待たずにブラウザ側で先に反映する。
+   * 送る値はサーバーが保存する値と同じなので、
+   * 保存が成功すれば再取得後もそのまま一致する（失敗時だけ巻き戻す）。
+   */
+  const [ratingDrafts, setRatingDrafts] = useState<Record<string, number>>({});
+
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
   const router = useRouter();
 
@@ -70,12 +79,13 @@ export default function Step1Client({
         }
         return res;
       },
-      { success: "課題候補を追加しました" }
+      { key: "add-candidate", success: "課題候補を追加しました" }
     );
   };
 
-  const handleSetMain = (title: string) => {
+  const handleSetMain = (id: string, title: string) => {
     run(() => setMainProblem(projectId, title), {
+      key: `main-${id}`,
       confirm: {
         title: "メイン課題として設定しますか？",
         message: `「${title}」\n\nチーム全員の前提が変わり、STEP 2 以降がこの課題を軸に進みます。メンバーにも通知されます。`,
@@ -120,8 +130,12 @@ export default function Step1Client({
               className="w-full text-base"
             />
           </div>
-          <PixelButton type="submit" disabled={isPending || !newTitle.trim()} className="h-[46px] px-8">
-            {isPending ? "…" : <FaPaperPlane />}
+          <PixelButton
+            type="submit"
+            disabled={isBusy("add-candidate") || !newTitle.trim()}
+            className="h-[46px] px-8 flex items-center justify-center"
+          >
+            {isBusy("add-candidate") ? <Spinner size={14} /> : <FaPaperPlane />}
           </PixelButton>
         </form>
 
@@ -139,11 +153,26 @@ export default function Step1Client({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {candidates.map((candidate) => {
-              const myRating = candidate.reactions.find((r) => r.profileId === currentProfileId)?.score || 0;
-              const total = candidate.reactions.reduce((sum, r) => sum + r.score, 0);
-              const avgScore =
-                candidate.reactions.length > 0 ? (total / candidate.reactions.length).toFixed(1) : "0.0";
-              const participationRate = (candidate.reactions.length / totalMembers) * 100;
+              // 楽観更新を反映したリアクション一覧。
+              // 平均点と参加率のリングも、押した直後に一緒に動く。
+              const draft = ratingDrafts[candidate.id];
+              const serverMine = candidate.reactions.find((r) => r.profileId === currentProfileId);
+              const reactions =
+                draft === undefined
+                  ? candidate.reactions
+                  : serverMine
+                    ? candidate.reactions.map((r) =>
+                        r.profileId === currentProfileId ? { ...r, score: draft } : r
+                      )
+                    : [
+                        ...candidate.reactions,
+                        { score: draft, profileId: currentProfileId, username: "あなた" },
+                      ];
+
+              const myRating = draft ?? serverMine?.score ?? 0;
+              const total = reactions.reduce((sum, r) => sum + r.score, 0);
+              const avgScore = reactions.length > 0 ? (total / reactions.length).toFixed(1) : "0.0";
+              const participationRate = (reactions.length / totalMembers) * 100;
               const isEditingThis = editingId === candidate.id;
 
               return (
@@ -235,8 +264,8 @@ export default function Step1Client({
                       background: `conic-gradient(#f97316 0% ${participationRate}%, #e7e5e4 ${participationRate}% 100%)`,
                     }}
                     title={
-                      candidate.reactions.length > 0
-                        ? candidate.reactions.map((r) => `${r.username}: ${r.score}点`).join("\n")
+                      reactions.length > 0
+                        ? reactions.map((r) => `${r.username}: ${r.score}点`).join("\n")
                         : "まだ誰も評価していません"
                     }
                   >
@@ -249,7 +278,7 @@ export default function Step1Client({
                   <div className="flex flex-col gap-3">
                     <div className="pt-2 border-t-2 border-dashed border-stone-200">
                       <div className="text-[10px] font-bold text-stone-400 mb-1.5">
-                        あなたの関心度（{candidate.reactions.length} / {totalMembers} 人が評価済み）
+                        あなたの関心度（{reactions.length} / {totalMembers} 人が評価済み）
                       </div>
                       <div className="flex items-center justify-between">
                         <FaFire className="text-stone-300" />
@@ -257,16 +286,27 @@ export default function Step1Client({
                           {[1, 2, 3, 4, 5].map((score) => (
                             <button
                               key={score}
-                              onClick={() =>
+                              onClick={() => {
+                                const previous = ratingDrafts[candidate.id];
+                                setRatingDrafts((d) => ({ ...d, [candidate.id]: score }));
                                 run(() => rateCandidate(candidate.id, projectId, score), {
+                                  key: `rate-${candidate.id}`,
                                   error: "評価の保存に失敗しました",
-                                })
-                              }
+                                  onError: () =>
+                                    setRatingDrafts((d) => {
+                                      const next = { ...d };
+                                      if (previous === undefined) delete next[candidate.id];
+                                      else next[candidate.id] = previous;
+                                      return next;
+                                    }),
+                                });
+                              }}
                               className={cn(
-                                "w-8 h-8 pixel-border-sm font-bold text-sm transition-transform hover:scale-110",
+                                "w-8 h-8 pixel-border-sm font-bold text-sm transition-all hover:scale-110 active:scale-95",
                                 myRating === score ? "bg-orange-500 text-white" : "bg-white hover:bg-orange-100"
                               )}
                               aria-label={`${score}点をつける`}
+                              aria-pressed={myRating === score}
                             >
                               {score}
                             </button>
@@ -286,12 +326,17 @@ export default function Step1Client({
                       </button>
 
                       <PixelButton
-                        onClick={() => handleSetMain(candidate.title)}
+                        onClick={() => handleSetMain(candidate.id, candidate.title)}
                         variant="secondary"
                         className="flex items-center gap-1 px-2 py-1 text-xs"
-                        disabled={isPending}
+                        disabled={isBusy(`main-${candidate.id}`)}
                       >
-                        <FaCrown className="text-yellow-500" /> メイン課題へ
+                        {isBusy(`main-${candidate.id}`) ? (
+                          <Spinner size={11} />
+                        ) : (
+                          <FaCrown className="text-yellow-500" />
+                        )}
+                        メイン課題へ
                       </PixelButton>
                     </div>
                   </div>

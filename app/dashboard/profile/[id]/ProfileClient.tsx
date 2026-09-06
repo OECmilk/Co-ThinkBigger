@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { ContributionGraph } from "@/components/ContributionGraph";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 
 type Profile = {
@@ -157,8 +158,8 @@ export function ProfileClient({
 
                 <div className="flex justify-end gap-2 pt-2">
                   <PixelButton variant="secondary" onClick={() => setIsEditing(false)}>キャンセル</PixelButton>
-                  <PixelButton onClick={handleSave} disabled={isPending}>
-                    <FaSave /> 保存
+                  <PixelButton onClick={handleSave} disabled={isPending} className="inline-flex items-center gap-2">
+                    {isPending ? <Spinner size={12} /> : <FaSave />} 保存
                   </PixelButton>
                 </div>
               </div>

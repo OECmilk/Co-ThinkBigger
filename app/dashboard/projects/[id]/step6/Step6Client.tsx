@@ -48,13 +48,39 @@ export default function Step6Client({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { run } = useAction();
 
+  /**
+   * チェックはサーバー往復を待たずに切り替える。
+   * `${solutionId}:${desireId}` → チェック状態、という上書き表だけ持ち、
+   * 失敗したらそのキーを取り下げてサーバーの状態に戻す。
+   */
+  const [checkDrafts, setCheckDrafts] = useState<Record<string, boolean>>({});
+  const draftKey = (solutionId: string, desireId: string) => `${solutionId}:${desireId}`;
+
+  const isSatisfied = (solution: Solution, desireId: string) =>
+    checkDrafts[draftKey(solution.id, desireId)] ?? solution.satisfiedDesireIds.includes(desireId);
+
+  const toggleCheck = (solution: Solution, desireId: string) => {
+    const key = draftKey(solution.id, desireId);
+    const next = !isSatisfied(solution, desireId);
+    setCheckDrafts((d) => ({ ...d, [key]: next }));
+
+    run(() => toggleEvaluation(solution.id, desireId, projectId), {
+      key: `eval-${key}`,
+      error: "評価の更新に失敗しました",
+      onError: () =>
+        setCheckDrafts((d) => {
+          const rest = { ...d };
+          delete rest[key];
+          return rest;
+        }),
+    });
+  };
+
   const selected = solutions.find((s) => s.id === selectedId) ?? solutions[0] ?? null;
 
   const scoreByType = (solution: Solution, type: DesireType) => {
     const total = desires.filter((d) => d.type === type).length;
-    const satisfied = desires.filter(
-      (d) => d.type === type && solution.satisfiedDesireIds.includes(d.id)
-    ).length;
+    const satisfied = desires.filter((d) => d.type === type && isSatisfied(solution, d.id)).length;
     return { total, satisfied, percent: total > 0 ? Math.round((satisfied / total) * 100) : 0 };
   };
 
@@ -200,15 +226,11 @@ export default function Step6Client({
 
                         <div className="space-y-2">
                           {typeDesires.map((d) => {
-                            const checked = selected.satisfiedDesireIds.includes(d.id);
+                            const checked = isSatisfied(selected, d.id);
                             return (
                               <button
                                 key={d.id}
-                                onClick={() =>
-                                  run(() => toggleEvaluation(selected.id, d.id, projectId), {
-                                    error: "評価の更新に失敗しました",
-                                  })
-                                }
+                                onClick={() => toggleCheck(selected, d.id)}
                                 className={cn(
                                   "w-full text-left p-3 pixel-border-sm transition-colors flex items-start gap-3",
                                   checked ? "bg-orange-50" : "bg-white hover:bg-stone-50"

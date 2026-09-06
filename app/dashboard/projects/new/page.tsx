@@ -8,6 +8,7 @@ import { PixelCard } from "@/components/ui/PixelCard";
 import { PixelInput } from "@/components/ui/PixelInput";
 import { PixelButton } from "@/components/ui/PixelButton";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { createProject } from "./actions";
 
 export default function NewProjectPage() {
@@ -86,7 +87,12 @@ export default function NewProjectPage() {
                 キャンセル
               </PixelButton>
             </Link>
-            <PixelButton type="submit" disabled={isPending || !name.trim()}>
+            <PixelButton
+              type="submit"
+              disabled={isPending || !name.trim()}
+              className="inline-flex items-center gap-2"
+            >
+              {isPending && <Spinner size={12} />}
               {isPending ? "作成中..." : "プロジェクトを開始"}
             </PixelButton>
           </div>

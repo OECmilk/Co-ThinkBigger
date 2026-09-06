@@ -94,136 +94,145 @@ export function ProjectSidebar({
   return (
     <aside
       className={cn(
-        "bg-white border-r-4 border-stone-800 p-4 shrink-0 flex flex-col transition-all duration-300 ease-in-out relative",
+        "bg-white border-r-4 border-stone-800 shrink-0 flex flex-col transition-all duration-300 ease-in-out relative",
+        // 本文が長いステップ（STEP 2/3 など）では、flex の伸長でサイドバーが
+        // ページ全体の高さまで引き伸ばされ、mt-auto の「ツール・管理」が
+        // 画面外のはるか下に追いやられていた。
+        // ヘッダー(h-16)の下に貼り付けて高さを固定し、
+        // はみ出す分は内側だけでスクロールさせる。
+        "md:sticky md:top-16 md:h-[calc(100vh-4rem)]",
         isCollapsed ? "w-20" : "w-72"
       )}
     >
+      {/* 開閉ボタンはスクロール領域の外に置く（内側だと縁からはみ出す分が切れる） */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-6 bg-stone-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-stone-700 z-10"
+        className="absolute -right-3 top-6 bg-stone-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md hover:bg-stone-700 z-20"
         aria-label={isCollapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
       >
         {isCollapsed ? <FaChevronRight /> : <FaChevronLeft />}
       </button>
 
-      {/* プロジェクト名と全体進捗 */}
-      <div className="mb-6 overflow-hidden shrink-0">
-        {!isCollapsed && (
-          <h2 className="text-xs font-bold text-stone-400 uppercase mb-1 whitespace-nowrap">プロジェクト</h2>
-        )}
-        <div className={cn("font-bold text-[#f97316]", isCollapsed ? "text-xs text-center truncate" : "truncate")}>
-          {isCollapsed ? projectName.substring(0, 2) : projectName}
-        </div>
-
-        <div className="mt-3">
-          <div className="h-2 bg-stone-200 overflow-hidden">
-            <div
-              className="h-full bg-[#f97316] transition-all duration-500"
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
+      <div className="flex flex-col flex-1 min-h-0 md:overflow-y-auto p-4">
+        {/* プロジェクト名と全体進捗 */}
+        <div className="mb-6 overflow-hidden shrink-0">
           {!isCollapsed && (
-            <div className="text-[10px] font-bold text-stone-500 mt-1">
-              {progress.completed} / {progress.steps.length} ステップ完了（{progress.percent}%）
-            </div>
+            <h2 className="text-xs font-bold text-stone-400 uppercase mb-1 whitespace-nowrap">プロジェクト</h2>
           )}
-        </div>
-      </div>
-
-      {/* 次にやること — 迷ったらここに戻れば再開できる */}
-      {!isCollapsed && progress.completed < progress.steps.length && (
-        <NavLink
-          href={progress.current.href}
-          className="block mb-6 bg-orange-50 border-l-4 border-[#f97316] p-3 hover:bg-orange-100 transition-colors"
-        >
-          <div className="text-[10px] font-bold text-[#f97316] mb-0.5">次にやること</div>
-          <div className="font-bold text-sm leading-tight">
-            {progress.current.num}. {progress.current.label}
+          <div className={cn("font-bold text-[#f97316]", isCollapsed ? "text-xs text-center truncate" : "truncate")}>
+            {isCollapsed ? projectName.substring(0, 2) : projectName}
           </div>
-          <div className="text-[10px] text-stone-600 mt-1 leading-snug">{progress.current.goal}</div>
-        </NavLink>
-      )}
 
-      <nav className="space-y-1.5 mb-6">
-        {!isCollapsed && (
-          <h3 className="text-[10px] font-bold text-stone-400 mb-2 px-1 whitespace-nowrap">THINK BIGGER</h3>
-        )}
-        {progress.steps.map((step) => {
-          const Icon = STEP_ICONS[step.id];
-          const isActive = activeStep?.id === step.id;
-          const state = step.done
-            ? "done"
-            : isActive || step.id === progress.current.id
-              ? "current"
-              : step.blocker
-                ? "blocked"
-                : "todo";
-
-          return (
-            <NavLink key={step.id} href={step.href}>
+          <div className="mt-3">
+            <div className="h-2 bg-stone-200 overflow-hidden">
               <div
-                className={cn(
-                  "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
-                  isCollapsed && "justify-center",
-                  isActive && "bg-stone-100 ring-2 ring-[#f97316]",
-                  step.done && !isActive && "bg-emerald-50/50"
-                )}
-                title={isCollapsed ? `${step.num}. ${step.label}（${step.detail}）` : step.detail}
-              >
-                <StatusMark state={state} />
-                {!isCollapsed && (
-                  <>
-                    <Icon
-                      className={cn(
-                        "text-base shrink-0 transition-colors",
-                        step.done ? "text-emerald-600" : isActive ? "text-[#f97316]" : "text-stone-400"
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold leading-tight truncate">
-                        {String(step.num).padStart(2, "0")}. {step.label}
-                      </span>
-                      <span className="block text-[10px] text-stone-400 truncate">{step.detail}</span>
-                    </span>
-                  </>
-                )}
+                className="h-full bg-[#f97316] transition-all duration-500"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+            {!isCollapsed && (
+              <div className="text-[10px] font-bold text-stone-500 mt-1">
+                {progress.completed} / {progress.steps.length} ステップ完了（{progress.percent}%）
               </div>
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      <nav className="space-y-1.5 mt-auto pt-4 border-t-2 border-dashed border-stone-200">
-        {!isCollapsed && <h3 className="text-[10px] font-bold text-stone-400 mb-2 px-1">ツール・管理</h3>}
-
-        <NavLink href={`/dashboard/projects/${projectId}/mindmap`}>
-          <div
-            className={cn(
-              "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
-              isCollapsed && "justify-center",
-              pathname.includes("mindmap") && "bg-stone-100 ring-2 ring-stone-300"
             )}
-            title={isCollapsed ? "マインドマップ" : ""}
-          >
-            <FaBrain className="text-stone-400 text-base group-hover:text-[#f97316] transition-colors shrink-0" />
-            {!isCollapsed && <span className="text-sm font-bold">マインドマップ</span>}
           </div>
-        </NavLink>
+        </div>
 
-        <NavLink href={`/dashboard/projects/${projectId}/members`}>
-          <div
-            className={cn(
-              "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
-              isCollapsed && "justify-center",
-              pathname.includes("members") && "bg-stone-100 ring-2 ring-stone-300"
-            )}
-            title={isCollapsed ? "メンバー" : ""}
+        {/* 次にやること — 迷ったらここに戻れば再開できる */}
+        {!isCollapsed && progress.completed < progress.steps.length && (
+          <NavLink
+            href={progress.current.href}
+            className="block mb-6 bg-orange-50 border-l-4 border-[#f97316] p-3 hover:bg-orange-100 transition-colors"
           >
-            <FaUsers className="text-stone-500 text-base group-hover:text-[#f97316] transition-colors shrink-0" />
-            {!isCollapsed && <span className="text-sm font-bold">メンバー</span>}
-          </div>
-        </NavLink>
-      </nav>
+            <div className="text-[10px] font-bold text-[#f97316] mb-0.5">次にやること</div>
+            <div className="font-bold text-sm leading-tight">
+              {progress.current.num}. {progress.current.label}
+            </div>
+            <div className="text-[10px] text-stone-600 mt-1 leading-snug">{progress.current.goal}</div>
+          </NavLink>
+        )}
+
+        <nav className="space-y-1.5 mb-6">
+          {!isCollapsed && (
+            <h3 className="text-[10px] font-bold text-stone-400 mb-2 px-1 whitespace-nowrap">THINK BIGGER</h3>
+          )}
+          {progress.steps.map((step) => {
+            const Icon = STEP_ICONS[step.id];
+            const isActive = activeStep?.id === step.id;
+            const state = step.done
+              ? "done"
+              : isActive || step.id === progress.current.id
+                ? "current"
+                : step.blocker
+                  ? "blocked"
+                  : "todo";
+
+            return (
+              <NavLink key={step.id} href={step.href}>
+                <div
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
+                    isCollapsed && "justify-center",
+                    isActive && "bg-stone-100 ring-2 ring-[#f97316]",
+                    step.done && !isActive && "bg-emerald-50/50"
+                  )}
+                  title={isCollapsed ? `${step.num}. ${step.label}（${step.detail}）` : step.detail}
+                >
+                  <StatusMark state={state} />
+                  {!isCollapsed && (
+                    <>
+                      <Icon
+                        className={cn(
+                          "text-base shrink-0 transition-colors",
+                          step.done ? "text-emerald-600" : isActive ? "text-[#f97316]" : "text-stone-400"
+                        )}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold leading-tight truncate">
+                          {String(step.num).padStart(2, "0")}. {step.label}
+                        </span>
+                        <span className="block text-[10px] text-stone-400 truncate">{step.detail}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        <nav className="space-y-1.5 mt-auto pt-4 shrink-0 border-t-2 border-dashed border-stone-200">
+          {!isCollapsed && <h3 className="text-[10px] font-bold text-stone-400 mb-2 px-1">ツール・管理</h3>}
+
+          <NavLink href={`/dashboard/projects/${projectId}/mindmap`}>
+            <div
+              className={cn(
+                "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
+                isCollapsed && "justify-center",
+                pathname.includes("mindmap") && "bg-stone-100 ring-2 ring-stone-300"
+              )}
+              title={isCollapsed ? "マインドマップ" : ""}
+            >
+              <FaBrain className="text-stone-400 text-base group-hover:text-[#f97316] transition-colors shrink-0" />
+              {!isCollapsed && <span className="text-sm font-bold">マインドマップ</span>}
+            </div>
+          </NavLink>
+
+          <NavLink href={`/dashboard/projects/${projectId}/members`}>
+            <div
+              className={cn(
+                "flex items-center gap-2.5 px-2.5 py-2.5 pixel-border-sm bg-white hover:bg-stone-50 transition-colors cursor-pointer group",
+                isCollapsed && "justify-center",
+                pathname.includes("members") && "bg-stone-100 ring-2 ring-stone-300"
+              )}
+              title={isCollapsed ? "メンバー" : ""}
+            >
+              <FaUsers className="text-stone-500 text-base group-hover:text-[#f97316] transition-colors shrink-0" />
+              {!isCollapsed && <span className="text-sm font-bold">メンバー</span>}
+            </div>
+          </NavLink>
+        </nav>
+      </div>
     </aside>
   );
 }

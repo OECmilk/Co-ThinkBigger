@@ -11,6 +11,7 @@ import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { AuthorStamp, PersonalTeamTabs, ShareBadge, type Author } from "@/components/project/Authorship";
 import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/components/project/StepScaffold";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 import type { DesireType, ProjectProgress, StepProgress } from "@/lib/project";
 
@@ -54,7 +55,7 @@ export default function Step3Client({
   const [activeTab, setActiveTab] = useState<"personal" | "team">("personal");
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const { run, isPending } = useAction();
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
 
   const mine = desires.filter((d) => d.isMine);
@@ -88,7 +89,7 @@ export default function Step3Client({
         }
         return res;
       },
-      { success: "望みを追加しました" }
+      { key: "add-desire", success: "望みを追加しました" }
     );
   };
 
@@ -188,28 +189,33 @@ export default function Step3Client({
                               <button
                                 onClick={() =>
                                   run(() => setShared("desire", desire.id, projectId, false), {
+                                    key: `share-${desire.id}`,
                                     success: "共有を取り消しました",
                                   })
                                 }
-                                className="text-[11px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1"
+                                className="text-[11px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1 disabled:opacity-50"
+                                disabled={isBusy(`share-${desire.id}`)}
                               >
-                                <FaUndo /> 取消
+                                {isBusy(`share-${desire.id}`) ? <Spinner size={9} /> : <FaUndo />} 取消
                               </button>
                             ) : (
                               <button
                                 onClick={() =>
                                   run(() => setShared("desire", desire.id, projectId, true), {
+                                    key: `share-${desire.id}`,
                                     success: "チームに共有しました",
                                   })
                                 }
-                                className="text-[11px] font-bold text-white bg-[#f97316] hover:bg-orange-600 px-2 py-1 flex items-center gap-1 pixel-border-sm"
+                                className="text-[11px] font-bold text-white bg-[#f97316] hover:bg-orange-600 px-2 py-1 flex items-center gap-1 pixel-border-sm disabled:bg-stone-400"
+                                disabled={isBusy(`share-${desire.id}`)}
                               >
-                                <FaShare /> 共有
+                                {isBusy(`share-${desire.id}`) ? <Spinner size={9} /> : <FaShare />} 共有
                               </button>
                             )}
                             <button
                               onClick={() =>
                                 run(() => deleteDesire(desire.id, projectId), {
+                                  key: `del-${desire.id}`,
                                   confirm: {
                                     title: "この望みを削除しますか？",
                                     message: `「${desire.content}」\n\nSTEP 6 でこの望みに対して付けた評価も消えます。`,
@@ -221,8 +227,9 @@ export default function Step3Client({
                               }
                               className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                               title="削除"
+                              disabled={isBusy(`del-${desire.id}`)}
                             >
-                              <FaTrash />
+                              {isBusy(`del-${desire.id}`) ? <Spinner size={11} /> : <FaTrash />}
                             </button>
                           </div>
                         )}
@@ -240,8 +247,12 @@ export default function Step3Client({
                     value={newDesire}
                     onChange={(e) => setNewDesire(e.target.value)}
                   />
-                  <PixelButton type="submit" disabled={isPending || !newDesire.trim()} className="shrink-0">
-                    <FaPlus />
+                  <PixelButton
+                    type="submit"
+                    disabled={isBusy("add-desire") || !newDesire.trim()}
+                    className="shrink-0 flex items-center justify-center"
+                  >
+                    {isBusy("add-desire") ? <Spinner size={12} /> : <FaPlus />}
                   </PixelButton>
                 </form>
               )}

@@ -8,6 +8,7 @@ import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { AuthorStamp, PersonalTeamTabs, ShareBadge, type Author } from "@/components/project/Authorship";
 import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/components/project/StepScaffold";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
@@ -39,7 +40,7 @@ export default function Step2Client({
   const [activeTab, setActiveTab] = useState<"personal" | "team">("personal");
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const { run, isPending } = useAction();
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
 
   const mine = subProblems.filter((s) => s.isMine);
@@ -59,7 +60,7 @@ export default function Step2Client({
         }
         return res;
       },
-      { success: "サブ課題を追加しました。まとまったらチームに共有しましょう" }
+      { key: "add-sub", success: "サブ課題を追加しました。まとまったらチームに共有しましょう" }
     );
   };
 
@@ -121,7 +122,7 @@ export default function Step2Client({
                 キャンセル
               </PixelButton>
               <PixelButton
-                disabled={!description.trim() || isPending}
+                disabled={!description.trim() || isBusy("main-problem")}
                 onClick={() =>
                   run(
                     async () => {
@@ -130,6 +131,7 @@ export default function Step2Client({
                       return res;
                     },
                     {
+                      key: "main-problem",
                       confirm: {
                         title: "メイン課題を書き換えますか？",
                         message: "チーム全員の作業の前提になります。変更はメンバーに通知されます。",
@@ -140,7 +142,7 @@ export default function Step2Client({
                   )
                 }
               >
-                <FaSave /> 保存
+                {isBusy("main-problem") ? <Spinner size={12} /> : <FaSave />} 保存
               </PixelButton>
             </div>
           </div>
@@ -186,6 +188,7 @@ export default function Step2Client({
                         <button
                           onClick={() =>
                             run(() => setShared("subProblem", sub.id, projectId, false), {
+                              key: `share-${sub.id}`,
                               confirm: {
                                 title: "共有を取り消しますか？",
                                 message:
@@ -195,21 +198,25 @@ export default function Step2Client({
                               success: "共有を取り消しました",
                             })
                           }
-                          className="text-stone-400 hover:text-stone-700 text-xs font-bold flex items-center gap-1"
+                          className="text-stone-400 hover:text-stone-700 text-xs font-bold flex items-center gap-1 disabled:opacity-50"
                           title="共有を取り消す"
+                          disabled={isBusy(`share-${sub.id}`)}
                         >
-                          <FaUndo /> 取消
+                          {isBusy(`share-${sub.id}`) ? <Spinner size={10} /> : <FaUndo />} 取消
                         </button>
                       ) : (
                         <button
                           onClick={() =>
                             run(() => setShared("subProblem", sub.id, projectId, true), {
+                              key: `share-${sub.id}`,
                               success: "チームに共有しました",
                             })
                           }
-                          className="text-white bg-[#f97316] hover:bg-orange-600 px-3 py-1.5 text-xs font-bold flex items-center gap-1 pixel-border-sm transition-colors"
+                          className="text-white bg-[#f97316] hover:bg-orange-600 px-3 py-1.5 text-xs font-bold flex items-center gap-1 pixel-border-sm transition-colors disabled:bg-stone-400"
+                          disabled={isBusy(`share-${sub.id}`)}
                         >
-                          <FaShare /> 共有する
+                          {isBusy(`share-${sub.id}`) ? <Spinner size={10} /> : <FaShare />}
+                          {isBusy(`share-${sub.id}`) ? "共有中…" : "共有する"}
                         </button>
                       ))}
 
@@ -217,6 +224,7 @@ export default function Step2Client({
                       <button
                         onClick={() =>
                           run(() => deleteSubProblem(sub.id, projectId), {
+                            key: `del-${sub.id}`,
                             confirm: {
                               title: "このサブ課題を削除しますか？",
                               message: `「${sub.title}」\n\nこのサブ課題に集めた先行事例もすべて削除され、これを使った解決策の構成が崩れます。`,
@@ -228,8 +236,9 @@ export default function Step2Client({
                         }
                         className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                         title="削除"
+                        disabled={isBusy(`del-${sub.id}`)}
                       >
-                        <FaTrash />
+                        {isBusy(`del-${sub.id}`) ? <Spinner size={11} /> : <FaTrash />}
                       </button>
                     )}
                   </div>
@@ -279,9 +288,10 @@ export default function Step2Client({
                 />
                 <button
                   type="submit"
-                  disabled={!newSubProblem.trim() || isPending}
-                  className="text-[#f97316] font-bold hover:underline text-sm disabled:text-stone-300 shrink-0"
+                  disabled={!newSubProblem.trim() || isBusy("add-sub")}
+                  className="text-[#f97316] font-bold hover:underline text-sm disabled:text-stone-300 shrink-0 flex items-center gap-1.5"
                 >
+                  {isBusy("add-sub") && <Spinner size={10} />}
                   追加
                 </button>
               </form>

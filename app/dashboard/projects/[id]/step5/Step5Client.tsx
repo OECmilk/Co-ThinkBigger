@@ -9,6 +9,7 @@ import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { AuthorStamp, type Author } from "@/components/project/Authorship";
 import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/components/project/StepScaffold";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
@@ -46,7 +47,7 @@ export default function Step5Client({
   const [editDraft, setEditDraft] = useState({ name: "", description: "" });
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const { run, isPending } = useAction();
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
 
   const usableRows = rows.filter((r) => r.choices.length > 0);
@@ -80,7 +81,7 @@ export default function Step5Client({
         }
         return res;
       },
-      { success: "解決策を保存しました。STEP 6 で評価できます" }
+      { key: "save-solution", success: "解決策を保存しました。STEP 6 で評価できます" }
     );
   };
 
@@ -215,11 +216,11 @@ export default function Step5Client({
                 </div>
                 <PixelButton
                   onClick={handleSave}
-                  disabled={!isComplete || !name.trim() || isPending}
+                  disabled={!isComplete || !name.trim() || isBusy("save-solution")}
                   className="sm:w-[130px] flex flex-col items-center justify-center gap-2 shrink-0"
                 >
-                  <FaSave className="text-xl" />
-                  <span>{isPending ? "保存中…" : "保存"}</span>
+                  {isBusy("save-solution") ? <Spinner size={20} /> : <FaSave className="text-xl" />}
+                  <span>{isBusy("save-solution") ? "保存中…" : "保存"}</span>
                 </PixelButton>
               </div>
             </div>
@@ -272,11 +273,13 @@ export default function Step5Client({
                                     if (!res.error) setEditingId(null);
                                     return res;
                                   },
-                                  { success: "更新しました" }
+                                  { key: `edit-${sol.id}`, success: "更新しました" }
                                 )
                               }
-                              className="text-xs bg-[#f97316] text-white px-2 py-1 font-bold"
+                              className="text-xs bg-[#f97316] text-white px-2 py-1 font-bold inline-flex items-center gap-1.5"
+                              disabled={isBusy(`edit-${sol.id}`)}
                             >
+                              {isBusy(`edit-${sol.id}`) && <Spinner size={9} />}
                               完了
                             </button>
                           </div>
@@ -323,6 +326,7 @@ export default function Step5Client({
                             <button
                               onClick={() =>
                                 run(() => deleteSolution(sol.id, projectId), {
+                                  key: `del-${sol.id}`,
                                   confirm: {
                                     title: "この解決策を削除しますか？",
                                     message: `「${sol.name}」\n\nSTEP 6 で付けた評価も一緒に消えます。`,
@@ -334,8 +338,9 @@ export default function Step5Client({
                               }
                               className="text-stone-300 hover:text-red-500 p-1"
                               title="削除"
+                              disabled={isBusy(`del-${sol.id}`)}
                             >
-                              <FaTrash size={12} />
+                              {isBusy(`del-${sol.id}`) ? <Spinner size={10} /> : <FaTrash size={12} />}
                             </button>
                           </div>
                         </>

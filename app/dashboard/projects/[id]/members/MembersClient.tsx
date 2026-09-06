@@ -9,6 +9,7 @@ import Link from "next/link";
 import { searchUsers, addMember } from "../actions";
 import { Avatar } from "@/components/project/Authorship";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 
 type Profile = { id: string; username: string; avatarUrl: string | null };
@@ -28,7 +29,7 @@ export default function MembersClient({
   const [results, setResults] = useState<Profile[]>([]);
   const [searched, setSearched] = useState(false);
 
-  const { run, isPending } = useAction();
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
 
   const origin =
@@ -52,10 +53,13 @@ export default function MembersClient({
       toast("2文字以上で検索してください", "error");
       return;
     }
-    run(async () => {
-      setResults((await searchUsers(query)) as Profile[]);
-      setSearched(true);
-    });
+    run(
+      async () => {
+        setResults((await searchUsers(query)) as Profile[]);
+        setSearched(true);
+      },
+      { key: "search" }
+    );
   };
 
   return (
@@ -104,8 +108,12 @@ export default function MembersClient({
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1"
               />
-              <PixelButton type="submit" disabled={isPending} className="shrink-0">
-                <FaSearch />
+              <PixelButton
+                type="submit"
+                disabled={isBusy("search")}
+                className="shrink-0 flex items-center justify-center"
+              >
+                {isBusy("search") ? <Spinner size={12} /> : <FaSearch />}
               </PixelButton>
             </form>
 
@@ -123,11 +131,15 @@ export default function MembersClient({
                     ) : (
                       <PixelButton
                         onClick={() =>
-                          run(() => addMember(projectId, user.id), { success: `${user.username} さんを追加しました` })
+                          run(() => addMember(projectId, user.id), {
+                            key: `add-${user.id}`,
+                            success: `${user.username} さんを追加しました`,
+                          })
                         }
-                        className="text-xs py-1 px-2 shrink-0"
-                        disabled={isPending}
+                        className="text-xs py-1 px-2 shrink-0 inline-flex items-center gap-1.5"
+                        disabled={isBusy(`add-${user.id}`)}
                       >
+                        {isBusy(`add-${user.id}`) && <Spinner size={9} />}
                         追加
                       </PixelButton>
                     )}

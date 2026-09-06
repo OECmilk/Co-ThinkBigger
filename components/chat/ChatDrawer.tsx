@@ -8,6 +8,7 @@ import { cn, timeAgo } from "@/lib/utils";
 import { Avatar } from "@/components/project/Authorship";
 import { deleteMessage, postMessage } from "@/app/dashboard/projects/[id]/actions";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Message = {
   id: string;
@@ -62,7 +63,7 @@ export function ChatDrawer({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string } | null>(null);
   const [stepColumnMissing, setStepColumnMissing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { run } = useAction();
+  const { run, isBusy } = useAction();
 
   const isDrawer = variant === "drawer";
   const active = isOpen || !isDrawer;
@@ -158,7 +159,7 @@ export function ChatDrawer({
         await fetchMessages();
         return res;
       },
-      { error: "メッセージの送信に失敗しました" }
+      { key: "send", error: "メッセージの送信に失敗しました" }
     );
   };
 
@@ -292,8 +293,12 @@ export function ChatDrawer({
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
-            <PixelButton type="submit" className="px-3 py-1 text-xs shrink-0" disabled={!newMessage.trim()}>
-              <FaPaperPlane />
+            <PixelButton
+              type="submit"
+              className="px-3 py-1 text-xs shrink-0 flex items-center justify-center"
+              disabled={!newMessage.trim() || isBusy("send")}
+            >
+              {isBusy("send") ? <Spinner size={11} /> : <FaPaperPlane />}
             </PixelButton>
           </div>
         </form>

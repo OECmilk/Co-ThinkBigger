@@ -9,6 +9,7 @@ import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { AuthorStamp, PersonalTeamTabs, type Author } from "@/components/project/Authorship";
 import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/components/project/StepScaffold";
 import { useAction } from "@/components/ui/useAction";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFeedback } from "@/components/ui/Feedback";
 import type { ProjectProgress, StepProgress } from "@/lib/project";
 
@@ -43,7 +44,7 @@ export default function Step4Client({
   const [form, setForm] = useState({ title: "", url: "", outside: false });
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const { run, isPending } = useAction();
+  const { run, isBusy } = useAction();
   const { toast } = useFeedback();
 
   const visible = (choices: Choice[]) =>
@@ -70,7 +71,7 @@ export default function Step4Client({
         }
         return res;
       },
-      { success: "先行事例を追加しました" }
+      { key: "add-choice", success: "先行事例を追加しました" }
     );
   };
 
@@ -201,28 +202,33 @@ export default function Step4Client({
                                   <button
                                     onClick={() =>
                                       run(() => setShared("choice", choice.id, projectId, false), {
+                                        key: `share-${choice.id}`,
                                         success: "共有を取り消しました",
                                       })
                                     }
-                                    className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1"
+                                    className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1 disabled:opacity-50"
+                                    disabled={isBusy(`share-${choice.id}`)}
                                   >
-                                    <FaUndo /> 取消
+                                    {isBusy(`share-${choice.id}`) ? <Spinner size={9} /> : <FaUndo />} 取消
                                   </button>
                                 ) : (
                                   <button
                                     onClick={() =>
                                       run(() => setShared("choice", choice.id, projectId, true), {
+                                        key: `share-${choice.id}`,
                                         success: "チームに共有しました",
                                       })
                                     }
-                                    className="text-[10px] font-bold text-white bg-[#f97316] hover:bg-orange-600 px-2 py-0.5 flex items-center gap-1 pixel-border-sm"
+                                    className="text-[10px] font-bold text-white bg-[#f97316] hover:bg-orange-600 px-2 py-0.5 flex items-center gap-1 pixel-border-sm disabled:bg-stone-400"
+                                    disabled={isBusy(`share-${choice.id}`)}
                                   >
-                                    <FaShare /> 共有
+                                    {isBusy(`share-${choice.id}`) ? <Spinner size={9} /> : <FaShare />} 共有
                                   </button>
                                 )}
                                 <button
                                   onClick={() =>
                                     run(() => deleteChoice(choice.id, projectId), {
+                                      key: `del-${choice.id}`,
                                       confirm: {
                                         title: "この先行事例を削除しますか？",
                                         message: `「${choice.title}」`,
@@ -234,8 +240,9 @@ export default function Step4Client({
                                   }
                                   className="text-stone-300 hover:text-red-500 ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                                   title="削除"
+                                  disabled={isBusy(`del-${choice.id}`)}
                                 >
-                                  <FaTrash size={12} />
+                                  {isBusy(`del-${choice.id}`) ? <Spinner size={10} /> : <FaTrash size={12} />}
                                 </button>
                               </div>
                             )}
@@ -281,9 +288,10 @@ export default function Step4Client({
                                 </button>
                                 <button
                                   type="submit"
-                                  disabled={!form.title.trim() || isPending}
-                                  className="text-[11px] bg-[#f97316] text-white px-2 py-1 font-bold disabled:bg-stone-300"
+                                  disabled={!form.title.trim() || isBusy("add-choice")}
+                                  className="text-[11px] bg-[#f97316] text-white px-2 py-1 font-bold disabled:bg-stone-300 inline-flex items-center gap-1.5"
                                 >
+                                  {isBusy("add-choice") && <Spinner size={9} />}
                                   追加
                                 </button>
                               </div>

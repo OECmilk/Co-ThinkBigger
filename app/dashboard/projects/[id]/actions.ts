@@ -262,10 +262,34 @@ export async function deleteSubProblem(id: string, projectId: string): Promise<A
  * 共有 / 共有解除
  * ========================================================== */
 
+/**
+ * 本文の列名がテーブルごとに違う（SubProblem/Choice は title、Desire は content）。
+ * ここを一律 "title, content" で引くと、存在しない列を要求して
+ * クエリ自体が失敗し、「対象が見つかりません」になってしまうので
+ * テーブルごとに正しい列を持たせる。
+ */
 const SHARE_TARGETS = {
-  subProblem: { table: "SubProblem", step: "step2", label: "サブ課題", after: ["step2", "step4", "step5"] },
-  desire: { table: "Desire", step: "step3", label: "望み", after: ["step3", "step6"] },
-  choice: { table: "Choice", step: "step4", label: "先行事例", after: ["step4", "step5"] },
+  subProblem: {
+    table: "SubProblem",
+    textColumn: "title",
+    step: "step2",
+    label: "サブ課題",
+    after: ["step2", "step4", "step5"],
+  },
+  desire: {
+    table: "Desire",
+    textColumn: "content",
+    step: "step3",
+    label: "望み",
+    after: ["step3", "step6"],
+  },
+  choice: {
+    table: "Choice",
+    textColumn: "title",
+    step: "step4",
+    label: "先行事例",
+    after: ["step4", "step5"],
+  },
 } as const;
 
 export type ShareTarget = keyof typeof SHARE_TARGETS;
@@ -282,13 +306,15 @@ export async function setShared(
   const target = SHARE_TARGETS[type];
   const supabase = await getSupabase();
 
-  const { data: row } = await supabase
+  const { data: row, error: selectError } = await supabase
     .from(target.table)
-    .select("authorId, title, content")
+    .select(`authorId, ${target.textColumn}`)
     .eq("id", id)
-    .single();
+    .maybeSingle();
+
+  if (selectError) return fail("対象の取得に失敗しました。");
   if (!row) return fail("対象が見つかりません。");
-  if (row.authorId !== profile!.id && role !== "owner") {
+  if (String((row as any).authorId) !== String(profile!.id) && role !== "owner") {
     return fail("共有状態を変えられるのは作成者本人（またはオーナー）だけです。");
   }
 
@@ -296,12 +322,11 @@ export async function setShared(
   if (updateError) return fail("共有状態の変更に失敗しました。");
 
   if (isShared) {
-    const text = (row as any).title || (row as any).content || "";
     await notifyProjectMembers({
       projectId,
       actorProfileId: profile!.id,
       title: `${target.label}が共有されました`,
-      content: `${profile!.username} さんが「${text}」をチームに共有しました`,
+      content: `${profile!.username} さんが「${(row as any)[target.textColumn] ?? ""}」をチームに共有しました`,
       link: stepPath(projectId, target.step),
     });
   }
