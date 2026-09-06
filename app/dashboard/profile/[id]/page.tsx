@@ -1,51 +1,37 @@
-import { createClient } from "@/lib/supabase/server";
-import { ProfileClient } from "./ProfileClient";
 import { redirect } from "next/navigation";
+import { getSupabase, getUser } from "@/lib/auth";
+import { ProfileClient } from "./ProfileClient";
 import { getContributionData } from "@/app/dashboard/projects/[id]/actions";
 
-export default async function ProfilePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const supabase = await getSupabase();
+
+  const [user, profileRes, achievementsRes, contributionData] = await Promise.all([
+    getUser(),
+    supabase.from("Profile").select("*").eq("id", id).single(),
+    supabase.from("Achievement").select("*").eq("profileId", id),
+    getContributionData(id),
+  ]);
 
   if (!user) redirect("/login");
 
-  // Fetch Profile Info
-  const { data: profile } = await supabase
-    .from("Profile")
-    .select("*")
-    .eq("id", id)
-    .single();
-
+  const profile = profileRes.data;
   if (!profile) {
-    return <div>Profile not found</div>;
+    return (
+      <div className="max-w-md mx-auto mt-16 text-center bg-white p-8 pixel-border-sm">
+        <p className="font-bold">プロフィールが見つかりませんでした。</p>
+      </div>
+    );
   }
-
-  // Determine ownership
-  // We need to check if the current user's profile ID matches the requested 'id'
-  // Or check if profile.userId matches user.id
-  const isOwner = profile.userId === user.id;
-
-  // Fetch Achievements
-  const { data: achievements } = await supabase
-    .from("Achievement")
-    .select("*")
-    .eq("profileId", id);
-
-  // Fetch Contribution Data
-  const contributionData = await getContributionData(id);
 
   return (
     <ProfileClient
       profile={profile}
-      achievements={achievements || []}
+      achievements={achievementsRes.data || []}
       contributionData={contributionData || {}}
-      isOwner={isOwner}
-      email={isOwner ? user.email : undefined}
+      isOwner={profile.userId === user.id}
+      email={profile.userId === user.id ? user.email : undefined}
     />
   );
 }

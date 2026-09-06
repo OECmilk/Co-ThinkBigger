@@ -41,7 +41,9 @@ function LoginForm() {
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        // 招待リンクから来た場合の戻り先(next)を OAuth 経由でも失わないようにする。
+        // これが無いと、招待を受けた人が SNS ログインした瞬間に招待先を見失っていた。
+        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next || "/dashboard")}`,
       },
     });
   };

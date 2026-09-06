@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CO-THINK BIGGER
 
-## Getting Started
+シーナ・アイエンガー『THINK BIGGER』の 6 ステップを、**離れたチームで最後までやり切る**ためのアプリ。
 
-First, run the development server:
+設計上の至上命題はこの 2 つだけです。
+
+1. **挫折なく遂行する** — いつ開いても「今どこにいて、次に何をするか」が分かる
+2. **離れたメンバーと難なく取り組める** — 誰が何をしたかが残り、非同期でも噛み合う
+
+---
+
+## ⚠️ 最初にやること: DB マイグレーション
+
+`migration_v2_collaboration.sql` を **Supabase の SQL Editor で 1 回実行してください**。
+冪等（何度実行しても安全）です。
+
+これを実行すると次が有効になります。
+
+| 内容 | 未実行だとどうなるか |
+|---|---|
+| `Solution.authorId` の追加 | **STEP 5 の「解決策の保存」が失敗し続けます**（アプリ側にフォールバックを入れてあるので保存自体は通りますが、作成者が記録されません） |
+| `Notification.link` / `projectId` / `actorId` | 通知は届くが、クリックしても該当ページに飛べません |
+| `Message.step` | ステップ別の議論スレッドが分かれず、全部が 1 つのスレッドに混ざります |
+| リアルタイム配信の有効化 | 他メンバーの変更が自動で反映されません（手動リロードが必要） |
+| 各種インデックス | 一覧が遅くなります |
+
+---
+
+## 開発
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+必要な環境変数
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+# .env.local
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SITE_URL=      # 招待リンクの生成に使用（本番URL）
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# .env
+DATABASE_URL=              # Prisma 用（アプリ本体は Supabase クライアント経由）
+DIRECT_URL=
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 画面と進み方
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+ダッシュボード  … プロジェクトごとの進捗バーと「次にやること」
+  └ プロジェクト
+      ├ 01 課題候補    課題を出し合い、1つをメイン課題に決める
+      ├ 02 課題分解    メイン課題を3つ以上のサブ課題に分けて共有する
+      ├ 03 要望分析    自分/ターゲット/第三者、3視点の望みを共有する
+      ├ 04 選択マップ  各サブ課題に先行事例を集める（1つ以上は領域外から）
+      ├ 05 組み合わせ  事例を1つずつ選び、解決策として保存する
+      ├ 06 評価        3視点の充足度で採点し、本命を決める
+      ├ マインドマップ
+      └ メンバー       招待リンク / ユーザー検索
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 個人と共有の使い分け（重要）
 
-## Deploy on Vercel
+THINK BIGGER の要は「**まず一人で考え、それから持ち寄る**」ことです。
+アプリでもそこを分けています。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **自分の下書き** … 書いても他のメンバーには見えない
+- **共有する** … チームの一覧に出る。**共有されたものだけが次のステップで使われる**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+具体的には:
+
+- STEP 4 の選択マップの「行」= **共有されたサブ課題**
+- STEP 5 で組み合わせられる事例 = **共有された事例**
+- STEP 6 の評価軸 = **共有された望み**
+
+共有は「取消」でいつでも戻せます。
+
+---
+
+## 主要なモジュール
+
+| パス | 役割 |
+|---|---|
+| `lib/auth.ts` | 認証・プロフィール取得を React `cache()` でリクエスト単位にメモ化 |
+| `lib/project.ts` | プロジェクトの全状態スナップショットと、6ステップの進捗モデル |
+| `lib/notifications.ts` | プロジェクトメンバーへの通知作成 |
+| `lib/badges.ts` | 実績バッジの唯一の定義（旧 ID のエイリアスを含む） |
+| `components/project/StepScaffold.tsx` | 各ステップの共通骨組み（ゴール表示・前提未達の案内・前後ナビ） |
+| `components/project/ProjectRealtime.tsx` | 他メンバーの変更を自動反映 |
+| `components/ui/Feedback.tsx` | トーストと確認ダイアログ |
+| `components/ui/useAction.ts` | server action の保留状態・確認・成功/失敗通知の共通化 |
+
+すべての server action は例外を投げず `{ error }` を返す規約です（`useAction` がトーストに出します）。
+
+---
+
+## 既知の課題
+
+- **RLS が実質無効** — 匿名キーで全テーブルが読めます。マインドマップの「個人スコープ」も
+  クライアント側フィルタに依存しているため、本番運用の前に Row Level Security の設定が必要です。
+- `prisma/schema.prisma` は実 DB と乖離しています（実際の型は各 `*.sql` を参照）。
+  アプリ本体は Prisma を使っていないため実害はありませんが、参照する際は注意してください。
+- メール通知は未実装（アプリ内通知のみ）。

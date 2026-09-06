@@ -1,44 +1,21 @@
-import { getSupabase } from "@/lib/auth";
+import { getProjectSnapshot } from "@/lib/project";
 import MembersClient from "./MembersClient";
 
 export default async function MembersPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await getSupabase();
 
-  const [project, membersRes] = await Promise.all([
-    supabase
-      .from("Project")
-      .select("inviteCode")
-      .eq("id", id)
-      .single(),
+  // メンバーと招待コードは layout が取得済みのスナップショットから
+  const snapshot = await getProjectSnapshot(id);
 
-    supabase
-      .from("ProjectMember")
-      .select(`
-        id,
-        role,
-        profile:Profile (
-          id,
-          username,
-          avatarUrl
-        )
-      `)
-      .eq("projectId", id),
-  ]);
-
-  // Cast members to match expected type (profile can be array if not careful, but relation is to-one)
-  // Just ensuring typing is handled
-  const formattedMembers = (membersRes.data || []).map((m: any) => ({
-    id: m.id,
+  const members = snapshot.members.map((m) => ({
+    id: String(m.profile.id),
     role: m.role,
-    profile: Array.isArray(m.profile) ? m.profile[0] : m.profile
+    profile: {
+      id: String(m.profile.id),
+      username: m.profile.username,
+      avatarUrl: m.profile.avatarUrl,
+    },
   }));
 
-  return (
-    <MembersClient
-      projectId={id}
-      initialMembers={formattedMembers}
-      inviteCode={project.data?.inviteCode || ""}
-    />
-  );
+  return <MembersClient projectId={id} initialMembers={members} inviteCode={snapshot.inviteCode || ""} />;
 }

@@ -1,54 +1,55 @@
-import { getSupabase, getProfile, getUser } from "@/lib/auth";
+import { getSupabase, getProfile } from "@/lib/auth";
+import { getProjectProgress, getProjectSnapshot } from "@/lib/project";
 import Step1Client from "./Step1Client";
 import { redirect } from "next/navigation";
 
-export default async function Step1Page({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function Step1Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await getSupabase();
 
-  // 認証情報は layout で解決済みのものがキャッシュから返るため、
-  // 認証待ちをせずにページ本体のクエリを並列で走らせる。
-  const [user, profile, candidatesRes, memberCountRes] = await Promise.all([
-    getUser(),
+  const [profile, snapshot, progress, candidatesRes] = await Promise.all([
     getProfile(),
-
-    // Fetch Candidates with Reactions
+    getProjectSnapshot(id),
+    getProjectProgress(id),
     supabase
       .from("Candidate")
-      .select(`
-        id,
-        title,
-        authorId,
-        createdAt,
-        reactions:Reaction(score, profile:Profile(id, username)),
-        messages:Message(count)
-      `)
+      .select(
+        `id, title, authorId, createdAt,
+         reactions:Reaction(score, profileId),
+         messages:Message(count)`
+      )
       .eq("projectId", id)
       .order("createdAt", { ascending: false }),
-
-    // Fetch Member Count
-    supabase
-      .from("ProjectMember")
-      .select("id", { count: "exact", head: true })
-      .eq("projectId", id),
   ]);
 
-  if (!user) redirect("/login");
-  if (!profile) return <div>Profile Error (Please re-login)</div>;
+  if (!profile) redirect("/login");
 
-  const totalMembers = memberCountRes.count || 1;
+  // 投稿者と投票者を、プロジェクトメンバーの情報に突き合わせて名前・アイコンを出せるようにする。
+  // Candidate.authorId は Auth の user id、Reaction.profileId は Profile.id という
+  // 歴史的なズレがあるので、ここで両方引ける形に正規化しておく。
+  const candidates = (candidatesRes.data || []).map((c: any) => ({
+    id: String(c.id),
+    title: c.title,
+    createdAt: c.createdAt,
+    author: snapshot.memberByUserId.get(String(c.authorId)) ?? null,
+    isMine: String(c.authorId) === String(profile.userId),
+    messageCount: c.messages?.[0]?.count ?? 0,
+    reactions: (c.reactions || []).map((r: any) => ({
+      score: r.score,
+      profileId: String(r.profileId),
+      username: snapshot.memberByProfileId.get(String(r.profileId))?.username ?? "不明",
+    })),
+  }));
 
   return (
     <Step1Client
       projectId={id}
-      candidates={candidatesRes.data as any}
-      currentProfileId={profile.id}
-      currentUserId={user.id}
-      totalMembers={totalMembers}
+      step={progress.steps[0]}
+      progress={progress}
+      candidates={candidates}
+      currentProfileId={String(profile.id)}
+      mainProblem={snapshot.description}
+      totalMembers={Math.max(snapshot.members.length, 1)}
     />
   );
 }

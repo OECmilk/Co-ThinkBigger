@@ -381,6 +381,7 @@ function MindMapFlow({
           onClose={() => { }} // No close
           projectId={projectId}
           candidateId={null}
+          step="mindmap"
           title="マインドマップチャット"
           variant="inline"
           inputRef={chatInputRef}

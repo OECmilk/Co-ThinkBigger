@@ -1,234 +1,337 @@
 "use client";
 
 import { useState } from "react";
-import { PixelButton } from "@/components/ui/PixelButton";
-import { addChoice, deleteChoice, shareItem } from "../actions";
-import { FaPlus, FaTrash, FaGlobe, FaStar, FaUser, FaUsers, FaShare } from "react-icons/fa";
+import { addChoice, deleteChoice, setShared } from "../actions";
+import { FaPlus, FaTrash, FaGlobe, FaShare, FaUndo, FaComments, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import { SearchGuide } from "./SearchGuide";
-import { PixelCard } from "@/components/ui/PixelCard";
+import { ChatDrawer } from "@/components/chat/ChatDrawer";
+import { AuthorStamp, PersonalTeamTabs, type Author } from "@/components/project/Authorship";
+import { StepHeader, StepFooterNav, EmptyState, BlockerNotice } from "@/components/project/StepScaffold";
+import { useAction } from "@/components/ui/useAction";
+import { useFeedback } from "@/components/ui/Feedback";
+import type { ProjectProgress, StepProgress } from "@/lib/project";
 
 type Choice = {
   id: string;
-  subProblemId: string;
   title: string;
-  sourceURL?: string | null;
+  sourceURL: string | null;
   isOutsideDomain: boolean;
-  authorId?: string;
-  isShared?: boolean;
+  isShared: boolean;
+  createdAt: string;
+  author: Author;
+  isMine: boolean;
 };
 
-type SubProblem = {
-  id: string;
-  title: string;
-  choices: Choice[];
-};
+type Row = { id: string; title: string; choices: Choice[] };
 
 export default function Step4Client({
   projectId,
-  subProblems,
-  currentProfileId
+  step,
+  progress,
+  mainProblem,
+  rows,
 }: {
   projectId: string;
-  subProblems: SubProblem[];
-  currentProfileId: string;
+  step: StepProgress;
+  progress: ProjectProgress;
+  mainProblem: string;
+  rows: Row[];
 }) {
-  const [addingTo, setAddingTo] = useState<string | null>(null); // subProblemId
-  const [newTitle, setNewTitle] = useState("");
-  const [isOutside, setIsOutside] = useState(false);
-  const [newURL, setNewURL] = useState("");
-  const [activeTab, setActiveTab] = useState<'personal' | 'team'>('personal');
+  const [activeTab, setActiveTab] = useState<"personal" | "team">("personal");
+  const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", url: "", outside: false });
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
-  const handleAdd = async (e: React.FormEvent, subProblemId: string) => {
+  const { run, isPending } = useAction();
+  const { toast } = useFeedback();
+
+  const visible = (choices: Choice[]) =>
+    activeTab === "personal" ? choices.filter((c) => c.isMine) : choices.filter((c) => c.isShared);
+
+  const personalCount = rows.reduce((n, r) => n + r.choices.filter((c) => c.isMine).length, 0);
+  const teamCount = rows.reduce((n, r) => n + r.choices.filter((c) => c.isShared).length, 0);
+  const teamOutsideCount = rows.reduce(
+    (n, r) => n + r.choices.filter((c) => c.isShared && c.isOutsideDomain).length,
+    0
+  );
+
+  const submitChoice = (e: React.FormEvent, subProblemId: string) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
-
-    await addChoice(subProblemId, projectId, newTitle, isOutside, newURL);
-    setNewTitle("");
-    setNewURL("");
-    setIsOutside(false);
-    setAddingTo(null);
+    if (!form.title.trim()) return;
+    const payload = { ...form };
+    run(
+      async () => {
+        const res = await addChoice(subProblemId, projectId, payload.title, payload.outside, payload.url);
+        if (!res.error) {
+          setForm({ title: "", url: "", outside: false });
+          setAddingTo(null);
+          res.unlocked?.forEach((b) => toast(`${b.icon} 実績「${b.label}」を獲得しました！`, "success"));
+        }
+        return res;
+      },
+      { success: "先行事例を追加しました" }
+    );
   };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="bg-white p-6 pixel-border-sm space-y-4">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <span className="text-[#f97316]">STEP 04</span> 選択マップ
-          </h2>
-          <p className="text-stone-600 text-sm mt-2">
-            分解したサブ課題それぞれに対し、解決策となる「先行事例」を集めましょう。<br />
-            特に「<span className="text-purple-600 font-bold">領域外</span>」の事例を集めることが重要です。
-          </p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-stone-200">
+      <StepHeader
+        step={step}
+        description={
+          <>
+            サブ課題ごとに「すでに世の中にある解き方」を集めます。
+            <br />
+            <span className="text-purple-700 font-bold">まったく別の分野（領域外）の事例</span>が、
+            斬新な組み合わせの材料になります。ここを飛ばすと STEP 5 で手が止まります。
+          </>
+        }
+        actions={
           <button
-            onClick={() => setActiveTab('personal')}
+            onClick={() => setIsChatOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white pixel-border-sm text-stone-600 hover:text-[#f97316] font-bold text-sm transition-colors shrink-0"
+          >
+            <FaComments /> このステップの議論
+          </button>
+        }
+      />
+
+      {step.blocker ? (
+        <BlockerNotice blocker={step.blocker} steps={progress.steps} />
+      ) : (
+        <>
+          {mainProblem && (
+            <div className="bg-white pixel-border-sm p-4 text-sm">
+              <span className="text-[11px] font-bold text-stone-400 block mb-1">メイン課題</span>
+              <span className="font-bold break-words">{mainProblem}</span>
+            </div>
+          )}
+
+          {/* 領域外がゼロだと THINK BIGGER にならないので、はっきり警告する */}
+          <div
             className={cn(
-              "px-6 py-3 font-bold text-sm flex items-center gap-2 transition-colors border-b-2",
-              activeTab === 'personal'
-                ? "border-[#f97316] text-[#f97316] bg-orange-50"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+              "flex items-start gap-3 p-4 text-sm border-l-4",
+              teamOutsideCount > 0 ? "bg-emerald-50 border-emerald-500" : "bg-purple-50 border-purple-500"
             )}
           >
-            <FaUser /> 個人
-          </button>
-          <button
-            onClick={() => setActiveTab('team')}
-            className={cn(
-              "px-6 py-3 font-bold text-sm flex items-center gap-2 transition-colors border-b-2",
-              activeTab === 'team'
-                ? "border-[#f97316] text-[#f97316] bg-orange-50"
-                : "border-transparent text-stone-500 hover:text-stone-800"
+            {teamOutsideCount > 0 ? (
+              <FaCheckCircle className="text-emerald-600 mt-0.5 shrink-0" />
+            ) : (
+              <FaExclamationTriangle className="text-purple-600 mt-0.5 shrink-0" />
             )}
-          >
-            <FaUsers /> チーム
-          </button>
-        </div>
-      </div>
+            <div>
+              <div className="font-bold">
+                領域外の事例: チーム共有 {teamOutsideCount} 件
+              </div>
+              <p className="text-stone-700 mt-0.5">
+                {teamOutsideCount > 0
+                  ? "良い状態です。もう少し遠い分野からも探すと、組み合わせの幅が広がります。"
+                  : "同じ業界の中だけで探すと、既存の解決策の焼き直しになります。まったく別の分野の事例を1つは入れましょう（追加時に「領域外」にチェック）。"}
+              </p>
+            </div>
+          </div>
 
-      <SearchGuide />
+          <SearchGuide />
 
-      {/* Choice Map Table */}
-      <div className="overflow-x-auto pb-4">
-        <table className="w-full border-collapse min-w-[800px]">
-          <thead className="bg-stone-800 text-white">
-            <tr>
-              <th className="p-4 text-left w-[200px] border-r-2 border-stone-600 pixel-border-sm sticky left-0 z-10 bg-stone-800">
-                サブ課題
-              </th>
-              <th className="p-4 text-left">
-                先行事例 - {activeTab === 'personal' ? '自分のリスト' : '共有リスト'}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white">
-            {subProblems.map((sub, idx) => {
-              // Filter Choices
-              const filteredChoices = sub.choices.filter(c => {
-                if (activeTab === 'personal') return c.authorId === currentProfileId;
-                return c.isShared;
-              });
+          <div className="bg-white pixel-border-sm">
+            <PersonalTeamTabs
+              value={activeTab}
+              onChange={setActiveTab}
+              personalCount={personalCount}
+              teamCount={teamCount}
+            />
 
-              return (
-                <tr key={sub.id} className={idx % 2 === 0 ? "bg-white" : "bg-stone-50"}>
-                  <td className="p-4 font-bold border-r-2 border-stone-200 align-top sticky left-0 bg-inherit z-10 pixel-border-sm">
-                    {sub.title}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-wrap gap-4 items-start">
-                      {filteredChoices.map(choice => (
-                        <div
-                          key={choice.id}
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-stone-500">
+                {activeTab === "personal"
+                  ? "自分で集めた事例です。使えそうなものを共有すると、チームの組み合わせ候補になります。"
+                  : "チームで共有された事例です。STEP 5 で組み合わせられるのはここに並んだものだけです。"}
+              </p>
+
+              <div className="space-y-6">
+                {rows.map((row) => {
+                  const choices = visible(row.choices);
+                  return (
+                    <div key={row.id} className="border-l-4 border-stone-800 pl-4">
+                      <div className="flex items-baseline justify-between gap-3 mb-3 flex-wrap">
+                        <h4 className="font-bold break-words">{row.title}</h4>
+                        <span
                           className={cn(
-                            "relative group p-3 pr-6 rounded pixel-border-sm w-[160px] bg-white",
-                            choice.isOutsideDomain ? "border-l-4 border-purple-500" : ""
+                            "text-[11px] font-bold px-2 py-0.5",
+                            choices.length === 0 ? "bg-stone-100 text-stone-500" : "bg-orange-100 text-orange-800"
                           )}
                         >
-                          <p className="font-bold text-xs mb-1 break-words leading-tight">{choice.title}</p>
-                          {choice.sourceURL && (
-                            <a
-                              href={choice.sourceURL}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-blue-500 hover:underline flex items-center gap-1"
-                            >
-                              <FaGlobe /> リンク
-                            </a>
-                          )}
+                          {choices.length} 件
+                        </span>
+                      </div>
 
-                          <div className="absolute top-1 right-1 flex flex-col gap-1 items-end">
-                            <button
-                              onClick={() => deleteChoice(choice.id, projectId)}
-                              className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <FaTrash size={12} />
-                            </button>
+                      <div className="flex flex-wrap gap-3 items-start">
+                        {choices.map((choice) => (
+                          <div
+                            key={choice.id}
+                            className={cn(
+                              "relative group p-3 pixel-border-sm w-[190px] bg-white",
+                              choice.isOutsideDomain && "border-l-4 border-purple-500"
+                            )}
+                          >
+                            <p className="font-bold text-xs mb-1 break-words leading-snug">{choice.title}</p>
 
-                            {/* Share Button */}
-                            {activeTab === 'personal' && !choice.isShared && (
-                              <button
-                                onClick={() => shareItem('choice', choice.id, projectId)}
-                                className="text-blue-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="チームに共有"
+                            {choice.isOutsideDomain && (
+                              <span className="inline-block text-[9px] bg-purple-100 text-purple-700 px-1 font-bold mb-1">
+                                領域外
+                              </span>
+                            )}
+
+                            {choice.sourceURL && (
+                              <a
+                                href={choice.sourceURL}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 mb-1"
                               >
-                                <FaShare size={12} />
-                              </button>
+                                <FaGlobe /> 出典を開く
+                              </a>
+                            )}
+
+                            <AuthorStamp author={choice.author} at={choice.createdAt} isMine={choice.isMine} />
+
+                            {choice.isMine && (
+                              <div className="mt-2 flex items-center gap-2">
+                                {choice.isShared ? (
+                                  <button
+                                    onClick={() =>
+                                      run(() => setShared("choice", choice.id, projectId, false), {
+                                        success: "共有を取り消しました",
+                                      })
+                                    }
+                                    className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1"
+                                  >
+                                    <FaUndo /> 取消
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      run(() => setShared("choice", choice.id, projectId, true), {
+                                        success: "チームに共有しました",
+                                      })
+                                    }
+                                    className="text-[10px] font-bold text-white bg-[#f97316] hover:bg-orange-600 px-2 py-0.5 flex items-center gap-1 pixel-border-sm"
+                                  >
+                                    <FaShare /> 共有
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() =>
+                                    run(() => deleteChoice(choice.id, projectId), {
+                                      confirm: {
+                                        title: "この先行事例を削除しますか？",
+                                        message: `「${choice.title}」`,
+                                        confirmLabel: "削除する",
+                                        tone: "danger",
+                                      },
+                                      success: "削除しました",
+                                    })
+                                  }
+                                  className="text-stone-300 hover:text-red-500 ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                                  title="削除"
+                                >
+                                  <FaTrash size={12} />
+                                </button>
+                              </div>
                             )}
                           </div>
+                        ))}
 
-                          {/* Shared Indicator */}
-                          {activeTab === 'personal' && choice.isShared && (
-                            <div className="mt-1">
-                              <span className="text-[9px] text-green-600 font-bold bg-green-50 px-1 border border-green-200 rounded">Shared</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Add Button - Only in Personal Tab */}
-                      {activeTab === 'personal' && (
-                        addingTo === sub.id ? (
-                          <div className="w-[160px] p-2 bg-white pixel-border-sm z-20">
-                            <form onSubmit={(e) => handleAdd(e, sub.id)} className="space-y-1">
+                        {activeTab === "personal" &&
+                          (addingTo === row.id ? (
+                            <form
+                              onSubmit={(e) => submitChoice(e, row.id)}
+                              className="w-[190px] p-3 bg-white pixel-border-sm space-y-2"
+                            >
                               <input
                                 className="w-full text-xs font-bold border-b border-stone-300 focus:outline-none focus:border-orange-500 py-1"
-                                placeholder="事例タイトル"
-                                value={newTitle}
-                                onChange={e => setNewTitle(e.target.value)}
+                                placeholder="事例のタイトル"
+                                value={form.title}
+                                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                                 autoFocus
                               />
                               <input
-                                className="w-full text-xs text-stone-500 border-b border-stone-300 focus:outline-none py-1"
-                                placeholder="URL (optional)"
-                                value={newURL}
-                                onChange={e => setNewURL(e.target.value)}
+                                className="w-full text-[11px] text-stone-500 border-b border-stone-300 focus:outline-none py-1"
+                                placeholder="出典 URL（任意）"
+                                value={form.url}
+                                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
                               />
-                              <div className="flex justify-between items-center pt-1">
-                                <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={isOutside}
-                                    onChange={e => setIsOutside(e.target.checked)}
-                                  />
-                                  <span className={isOutside ? "text-purple-600 font-bold" : "text-stone-500"}>領域外</span>
-                                </label>
-                                <div className="flex gap-1">
-                                  <button type="button" onClick={() => setAddingTo(null)} className="text-[10px] text-stone-400 hover:text-stone-600">✕</button>
-                                  <button type="submit" disabled={!newTitle} className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded font-bold">追加</button>
-                                </div>
+                              <label className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={form.outside}
+                                  onChange={(e) => setForm((f) => ({ ...f, outside: e.target.checked }))}
+                                />
+                                <span className={form.outside ? "text-purple-700 font-bold" : "text-stone-500"}>
+                                  別分野（領域外）の事例
+                                </span>
+                              </label>
+                              <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setAddingTo(null)}
+                                  className="text-[11px] text-stone-400 hover:text-stone-700"
+                                >
+                                  キャンセル
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={!form.title.trim() || isPending}
+                                  className="text-[11px] bg-[#f97316] text-white px-2 py-1 font-bold disabled:bg-stone-300"
+                                >
+                                  追加
+                                </button>
                               </div>
                             </form>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setAddingTo(sub.id)}
-                            className="min-h-[64px] w-[160px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 text-stone-400 hover:text-orange-500 hover:border-orange-500 hover:bg-orange-50 transition-colors rounded pixel-border-sm p-2"
-                          >
-                            <FaPlus />
-                            <span className="text-xs font-bold mt-1">追加</span>
-                          </button>
-                        )
-                      )}
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setForm({ title: "", url: "", outside: false });
+                                setAddingTo(row.id);
+                              }}
+                              className="min-h-[80px] w-[190px] flex flex-col items-center justify-center border-2 border-dashed border-stone-300 text-stone-400 hover:text-[#f97316] hover:border-[#f97316] hover:bg-orange-50 transition-colors p-2"
+                            >
+                              <FaPlus />
+                              <span className="text-xs font-bold mt-1">事例を追加</span>
+                            </button>
+                          ))}
+
+                        {choices.length === 0 && activeTab === "team" && (
+                          <p className="text-xs text-stone-400 py-6">
+                            まだ共有された事例がありません。「自分の下書き」タブから共有してください。
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {subProblems.length === 0 && (
-              <tr>
-                <td colSpan={2} className="p-8 text-center text-stone-400">
-                  まだサブ課題がありません。<br />STEP 2に戻って課題を分解してください。
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  );
+                })}
+
+                {rows.length === 0 && (
+                  <EmptyState
+                    title="選択マップの行がまだありません"
+                    hint="選択マップの行は、チームに共有されたサブ課題です。STEP 2 でサブ課題を共有すると、ここに並びます。"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <StepFooterNav progress={progress} current="step4" />
+
+      <ChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        projectId={projectId}
+        step="step4"
+        title="STEP 4 選択マップの議論"
+      />
     </div>
   );
 }

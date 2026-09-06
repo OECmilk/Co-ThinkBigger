@@ -6,11 +6,12 @@ import { PixelButton } from "@/components/ui/PixelButton";
 import { PixelInput } from "@/components/ui/PixelInput";
 import { FaEdit, FaSave, FaCamera, FaEnvelope, FaBriefcase, FaUser, FaMedal } from "react-icons/fa";
 import { updateProfile } from "../actions"; // Keep locally
-import { BADGES, Badge } from "@/lib/badges";
+import { BADGES, normalizeBadgeId, type BadgeType } from "@/lib/badges";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { ContributionGraph } from "@/components/ContributionGraph";
-import Image from "next/image";
+import { useAction } from "@/components/ui/useAction";
+import { useFeedback } from "@/components/ui/Feedback";
 
 type Profile = {
   id: string;
@@ -25,6 +26,8 @@ type Achievement = {
   badgeType: string;
   unlockedAt: string;
 };
+
+const BADGE_TYPES: BadgeType[] = ["CANDIDATE", "SUBPROBLEM", "DESIRE", "CHOICE", "SOLUTION"];
 
 export function ProfileClient({
   profile,
@@ -41,63 +44,52 @@ export function ProfileClient({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(profile.username);
-  const [isSaving, setIsSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { run, isPending } = useAction();
+  const { toast } = useFeedback();
 
-  // Derive Job Title from Achievements
-  const getJobTitle = () => {
-    if (!achievements || achievements.length === 0) return "Newcomer";
+  // 旧 ID（FIRST_CANDIDATE など）で保存された実績も同じバッジとして数える
+  const unlockedIds = new Set((achievements || []).map((a) => normalizeBadgeId(a.badgeType)));
+  const unlockedAtById = new Map(
+    (achievements || []).map((a) => [normalizeBadgeId(a.badgeType), a.unlockedAt])
+  );
 
-    // Sort badges by level (priority)
-    const unlockedBadges = BADGES.filter(b =>
-      achievements.some(a => a.badgeType === b.id)
-    ).sort((a, b) => b.level - a.level);
+  // 肩書きは、いちばんレベルの高い獲得済みバッジ
+  const jobTitle =
+    BADGES.filter((b) => unlockedIds.has(b.id)).sort((a, b) => b.level - a.level)[0]?.label ?? "Newcomer";
 
-    if (unlockedBadges.length > 0) {
-      return unlockedBadges[0].label; // Highest level badge as title
-    }
-    return "Newcomer";
-  };
-
-  const jobTitle = getJobTitle();
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    await updateProfile(profile.id, username, avatarUrl || undefined);
-    setIsEditing(false);
-    setIsSaving(false);
+  const handleSave = () => {
+    run(
+      async () => {
+        await updateProfile(profile.id, username, avatarUrl || undefined);
+        setIsEditing(false);
+      },
+      { success: "プロフィールを更新しました" }
+    );
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
 
-    // Upload to Supabase
     const supabase = createClient();
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    const fileExt = file.name.split(".").pop();
+    const filePath = `avatars/${profile.id}-${Date.now()}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('avatars') // Bucket name
-      .upload(filePath, file);
-
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
     if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
-      alert('Upload failed: ' + uploadError.message); // Simple feedback
+      toast(`画像のアップロードに失敗しました: ${uploadError.message}`, "error");
       return;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
     setAvatarUrl(publicUrl);
-    // Auto-save avatar when uploaded? Or wait for save button?
-    // User expects interaction. Let's force save or just update state.
-    // If we update state, user must click Save.
-    // But preview updates.
+    // アップロードしただけで保存されたと誤解しないよう、その場で保存まで済ませる
+    run(() => updateProfile(profile.id, username, publicUrl), { success: "アイコンを更新しました" });
   };
 
   return (
@@ -165,7 +157,7 @@ export function ProfileClient({
 
                 <div className="flex justify-end gap-2 pt-2">
                   <PixelButton variant="secondary" onClick={() => setIsEditing(false)}>キャンセル</PixelButton>
-                  <PixelButton onClick={handleSave} disabled={isSaving}>
+                  <PixelButton onClick={handleSave} disabled={isPending}>
                     <FaSave /> 保存
                   </PixelButton>
                 </div>
@@ -204,34 +196,59 @@ export function ProfileClient({
           <span className="text-[#f97316]">ACHIEVEMENTS</span> 獲得した実績
         </h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {BADGES.map(badge => {
-            const achievement = achievements.find(a => a.badgeType === badge.id);
-            const isUnlocked = !!achievement;
-
-            // Animation logic: if newly unlocked (e.g. within 1 minute of render), adding logic relies on persistent state or time check.
-            // Client side time check:
-            const isNew = isUnlocked && (new Date().getTime() - new Date(achievement.unlockedAt).getTime() < 60000);
+        {/*
+          全 30 個を並べるとロック済みの灰色タイルばかりになって逆に萎える。
+          種類ごとに「今の到達点」と「次に狙えるもの」だけを見せる。
+        */}
+        <div className="space-y-4">
+          {BADGE_TYPES.map((type) => {
+            const tiers = BADGES.filter((b) => b.type === type);
+            const earned = tiers.filter((b) => unlockedIds.has(b.id));
+            const highest = earned[earned.length - 1];
+            const next = tiers.find((b) => !unlockedIds.has(b.id));
+            const shown = [highest, next].filter(Boolean) as typeof tiers;
+            if (shown.length === 0) return null;
 
             return (
-              <div
-                key={badge.id}
-                className={cn(
-                  "p-2 flex flex-col items-center justify-center text-center gap-2 pixel-border-sm transition-all h-[140px] relative overflow-hidden",
-                  isUnlocked
-                    ? `bg-white ${badge.color} border-b-4` // unlocked
-                    : "bg-stone-100 text-stone-400 grayscale opacity-70", // locked
-                  isNew && "animate-pulse ring-2 ring-yellow-400"
-                )}
-              >
-                <div className="text-3xl mb-1">{badge.icon}</div>
-                <h3 className="font-bold text-xs leading-tight min-h-[2.5em] flex items-center justify-center">{badge.label}</h3>
-                <p className="text-[9px] opacity-80 leading-tight">{badge.description}</p>
-                {isUnlocked && (
-                  <span className="absolute top-1 right-1 text-[8px] font-bold bg-white/80 px-1 rounded text-stone-600">
-                    GET
+              <div key={type} className="bg-white pixel-border-sm p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <span className="font-bold text-sm">
+                    {tiers[0].icon} {tiers[0].label.replace(/ Lv\.\d+$/, "")}
                   </span>
-                )}
+                  <span className="text-[11px] font-bold text-stone-500">
+                    {earned.length} / {tiers.length} 段階
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {shown.map((badge) => {
+                    const isUnlocked = unlockedIds.has(badge.id);
+                    const at = unlockedAtById.get(badge.id);
+                    const isNew = !!at && Date.now() - new Date(at).getTime() < 60000;
+
+                    return (
+                      <div
+                        key={badge.id}
+                        className={cn(
+                          "p-3 flex items-center gap-3 pixel-border-sm relative",
+                          isUnlocked ? badge.color : "bg-stone-100 text-stone-400",
+                          isNew && "ring-2 ring-yellow-400"
+                        )}
+                      >
+                        <span className={cn("text-2xl", !isUnlocked && "grayscale opacity-60")}>{badge.icon}</span>
+                        <span className="min-w-0">
+                          <span className="block font-bold text-xs leading-tight">{badge.label}</span>
+                          <span className="block text-[10px] opacity-80 leading-tight">{badge.description}</span>
+                        </span>
+                        {isUnlocked && (
+                          <span className="absolute top-1 right-1 text-[8px] font-bold bg-white/80 px-1 text-stone-600">
+                            GET
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

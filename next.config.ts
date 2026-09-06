@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next 16 では `eslint` 設定キーが廃止され、build 時に ESLint は走らない。
+  // 残っていると起動のたびに "Unrecognized key" 警告が出るだけなので削除した。
   typescript: {
     ignoreBuildErrors: true,
   },

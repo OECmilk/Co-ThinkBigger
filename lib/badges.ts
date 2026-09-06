@@ -1,61 +1,91 @@
+/**
+ * 実績バッジ。
+ *
+ * 手数の多い手法を最後まで続けるための小さな報酬。
+ * 以前は「actions が発行する ID」「プロフィール画面が表示する ID」
+ * 「lib/badges.ts の定義」が三者三様で、実際には何も解除されなかった。
+ * ここを唯一の定義とし、旧 ID も同じバッジに寄せる。
+ */
 
-export type BadgeType = 'CANDIDATE' | 'CHOICE' | 'SOLUTION';
+export type BadgeType = "CANDIDATE" | "SUBPROBLEM" | "DESIRE" | "CHOICE" | "SOLUTION";
 
 export interface Badge {
-  id: string; // e.g. CANDIDATE_1
+  id: string; // 例: CANDIDATE_3
   type: BadgeType;
   level: number;
   label: string;
   description: string;
-  icon: string; // Emoji for now, can be replaced with Image URL
+  icon: string;
   color: string;
 }
 
-const LEVELS = [1, 3, 5, 10, 15, 20];
+export const BADGE_LEVELS = [1, 3, 5, 10, 15, 20];
 
-// Define base configurations for each type
-const CONFIG: Record<BadgeType, {
-  labelBase: string,
-  prefix: string,
-  iconBase: string
-}> = {
-  CANDIDATE: { labelBase: '課題ハンター', prefix: 'CANDIDATE', iconBase: '🌱' },
-  CHOICE: { labelBase: 'リサーチャー', prefix: 'CHOICE', iconBase: '🔍' },
-  SOLUTION: { labelBase: '解決策クリエイター', prefix: 'SOLUTION', iconBase: '🚀' }
+const CONFIG: Record<
+  BadgeType,
+  { labelBase: string; icon: string; noun: string; verb: string; color: string }
+> = {
+  CANDIDATE: {
+    labelBase: "課題ハンター",
+    icon: "🌱",
+    noun: "課題候補",
+    verb: "発見",
+    color: "bg-orange-50 text-orange-700 border-orange-300",
+  },
+  SUBPROBLEM: {
+    labelBase: "分解職人",
+    icon: "🧩",
+    noun: "サブ課題",
+    verb: "分解",
+    color: "bg-amber-50 text-amber-700 border-amber-300",
+  },
+  DESIRE: {
+    labelBase: "共感リサーチャー",
+    icon: "💛",
+    noun: "望み",
+    verb: "言語化",
+    color: "bg-rose-50 text-rose-700 border-rose-300",
+  },
+  CHOICE: {
+    labelBase: "事例コレクター",
+    icon: "🔍",
+    noun: "先行事例",
+    verb: "収集",
+    color: "bg-blue-50 text-blue-700 border-blue-300",
+  },
+  SOLUTION: {
+    labelBase: "解決策クリエイター",
+    icon: "🚀",
+    noun: "解決策",
+    verb: "提案",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-300",
+  },
 };
 
-export const BADGES: Badge[] = [];
-
-// Helper to generate color class based on level
-const getColor = (type: BadgeType, level: number) => {
-  // Orange for Candidate, Blue for Choice, Green for Solution?
-  // User requested "Orange gradation" for the *grass* (contribution graph).
-  // For cards, user said "Pixel art...".
-  // Let's stick to distinct colors for types for now as per previous design, but maybe align with user preference if specified.
-  // User: "Candidate count", "Choice count", "Solution count" -> 3 types.
-  // "Orange gradation" was for the *contribution graph*.
-  // For cards: "32*32bit dot art".
-  // I will use emojis as placeholders for the dot art.
-
-  if (type === 'CANDIDATE') return 'bg-orange-100 text-orange-700 border-orange-300';
-  if (type === 'CHOICE') return 'bg-blue-100 text-blue-700 border-blue-300';
-  if (type === 'SOLUTION') return 'bg-emerald-100 text-emerald-700 border-emerald-300';
-  return 'bg-gray-100';
-};
-
-(Object.keys(CONFIG) as BadgeType[]).forEach(type => {
+export const BADGES: Badge[] = (Object.keys(CONFIG) as BadgeType[]).flatMap((type) => {
   const conf = CONFIG[type];
-  LEVELS.forEach(level => {
-    BADGES.push({
-      id: `${conf.prefix}_${level}`,
-      type: type,
-      level: level,
-      label: `${conf.labelBase} Lv.${level}`,
-      description: `${level}個の${type === 'CANDIDATE' ? '課題' : type === 'CHOICE' ? '先行事例' : '解決策'}を${type === 'CANDIDATE' ? '発見' : type === 'CHOICE' ? '収集' : '提案'}しました`,
-      icon: conf.iconBase,
-      color: getColor(type, level)
-    });
-  });
+  return BADGE_LEVELS.map((level) => ({
+    id: `${type}_${level}`,
+    type,
+    level,
+    label: `${conf.labelBase} Lv.${level}`,
+    description: `${conf.noun}を${level}個${conf.verb}しました`,
+    icon: conf.icon,
+    color: conf.color,
+  }));
 });
 
-export const getBadge = (id: string) => BADGES.find(b => b.id === id);
+/**
+ * 旧バージョンが保存した実績 ID。
+ * 既存ユーザーの獲得済みバッジが消えないよう、Lv.1 に読み替える。
+ */
+const LEGACY_ALIASES: Record<string, string> = {
+  FIRST_CANDIDATE: "CANDIDATE_1",
+  FIRST_CHOICE: "CHOICE_1",
+  FIRST_SOLUTION: "SOLUTION_1",
+  FIRST_REACTION: "CANDIDATE_1",
+};
+
+export const normalizeBadgeId = (id: string) => LEGACY_ALIASES[id] ?? id;
+
+export const getBadge = (id: string) => BADGES.find((b) => b.id === normalizeBadgeId(id));
